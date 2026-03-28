@@ -4,6 +4,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 from crewai import Agent, Crew, Process, Task, LLM
 from crewai.project import CrewBase, agent, crew, task
+from .tools.antigravity_delegate import AntigravityDelegateTool
 
 # Load environment variables
 load_dotenv()
@@ -45,6 +46,9 @@ class MyHeraCrew():
             base_url=base_url,
             timeout=hera_llms['critic']['timeout']
         )
+        
+        # Tools
+        self.antigravity_tool = AntigravityDelegateTool()
 
     @agent
     def manager(self) -> Agent:
@@ -52,7 +56,8 @@ class MyHeraCrew():
             config=self.agents_config['manager'],
             llm=self.manager_llm,
             verbose=True,
-            allow_delegation=False
+            allow_delegation=True,
+            tools=[self.antigravity_tool]
         )
 
     @agent

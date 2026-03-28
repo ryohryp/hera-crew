@@ -1,5 +1,6 @@
 import sys
 import os
+from dotenv import load_dotenv
 
 # Add 'src' directory to python path for modular imports
 src_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -12,9 +13,13 @@ def run():
     """
     Run the crew.
     """
+    # Load environment variables
+    load_dotenv()
+    
     # Environment optimizations
-    os.environ["OLLAMA_NUM_PARALLEL"] = "4"
-    print("--- Starting HERA Multi-Agent System ---")
+    num_parallel = os.getenv("OLLAMA_NUM_PARALLEL", "4")
+    os.environ["OLLAMA_NUM_PARALLEL"] = str(num_parallel)
+    print(f"--- Starting HERA Multi-Agent System (Parallel: {num_parallel}) ---")
     
     # Using environment LLM (no explicit key requirement)
 

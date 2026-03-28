@@ -24,6 +24,7 @@ execution_routing:
     Execute the assigned subtasks based on the HERA routing logic.
     If LOCAL was recommended, the Thinker handles it.
     If FALLBACK was recommended or it is a "Late" stage task, the Manager takes over.
+    The Manager may further delegate to Antigravity if the task is highly complex.
     Current subtask: {current_subtask}
   expected_output: >-
     The technical result or code for the specific subtask.
