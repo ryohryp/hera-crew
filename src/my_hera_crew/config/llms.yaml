@@ -5,8 +5,10 @@ default_ollama_base_url: "http://localhost:11434"
 # HERA Strategy Models (Used in crew.py)
 hera:
   manager:
-    model: "ollama_chat/llama3.1:8b"
-    timeout: 120
+    # Set to deepseek-r1:14b (Default Local Power)
+    # To use Gemini, change to "gemini/gemini-1.5-flash"
+    model: "ollama_chat/deepseek-r1:14b"
+    timeout: 300  # R1 models think longer
   thinker:
     model: "ollama_chat/gemma3:latest"
     timeout: 60

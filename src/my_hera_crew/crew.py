@@ -23,32 +23,29 @@ class MyHeraCrew():
         with open(config_path, 'r', encoding='utf-8') as f:
             llm_settings = yaml.safe_load(f)
         
-        base_url = os.getenv("OLLAMA_BASE_URL", llm_settings.get("default_ollama_base_url"))
+        self.base_url = os.getenv("OLLAMA_BASE_URL", llm_settings.get("default_ollama_base_url"))
         hera_llms = llm_settings.get("hera", {})
         
-        # Manager: High-Reasoning DeepSeek-R1 (14B)
-        self.manager_llm = LLM(
-            model=hera_llms['manager']['model'],
-            base_url=base_url,
-            timeout=hera_llms['manager']['timeout']
-        )
-        
-        # Thinker: Fast & Sharp Gemma 3
-        self.thinker_llm = LLM(
-            model=hera_llms['thinker']['model'],
-            base_url=base_url,
-            timeout=hera_llms['thinker']['timeout']
-        )
-
-        # Critic: Logical & Meticulous Phi-4
-        self.critic_llm = LLM(
-            model=hera_llms['critic']['model'],
-            base_url=base_url,
-            timeout=hera_llms['critic']['timeout']
-        )
+        # Setup each LLM with Environment Overrides
+        self.manager_llm = self._setup_llm(hera_llms.get('manager'), "MANAGER_MODEL")
+        self.thinker_llm = self._setup_llm(hera_llms.get('thinker'), "THINKER_MODEL")
+        self.critic_llm = self._setup_llm(hera_llms.get('critic'), "CRITIC_MODEL")
         
         # Tools
         self.antigravity_tool = AntigravityDelegateTool()
+
+    def _setup_llm(self, config: dict, env_var: str) -> LLM:
+        """Helper to initialize LLM with environment variable support and Cloud/Local detection."""
+        model = os.getenv(env_var, config.get('model'))
+        timeout = config.get('timeout', 120)
+
+        # Smart routing: Use base_url ONLY for Ollama models
+        if "ollama" in model.lower():
+            return LLM(model=model, base_url=self.base_url, timeout=timeout)
+        else:
+            # For Gemini (e.g. "gemini/gemini-1.5-flash") or other cloud providers
+            # Make sure appropriate API keys (GOOGLE_API_KEY) are in .env
+            return LLM(model=model, timeout=timeout)
 
     @agent
     def manager(self) -> Agent:
