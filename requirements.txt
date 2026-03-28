@@ -1,0 +1,6 @@
+crewai[tools]
+langchain-community
+mcp
+python-dotenv
+pyyaml
+pydantic

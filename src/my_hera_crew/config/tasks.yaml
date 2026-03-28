@@ -1,0 +1,38 @@
+# Task definitions for HERA workflow
+
+task_decomposition:
+  description: >-
+    Decompose the user request: "{user_request}" into detailed subtasks. 
+    Each subtask must be a technical instruction (Manifest) that even a 
+    smaller model can understand.
+  expected_output: >-
+    A list of specific, actionable subtasks formatted as a technical manifest.
+  agent: thinker
+
+logic_evaluation:
+  description: >-
+    Evaluate if the following subtasks can be solved locally by Gemma 3 with 
+    high confidence:
+    {manifest}
+    Assess the complexity and potential for divergence.
+  expected_output: >-
+    A routing recommendation (LOCAL or FALLBACK) for each subtask.
+  agent: critic
+
+execution_routing:
+  description: >-
+    Execute the assigned subtasks based on the HERA routing logic.
+    If LOCAL was recommended, the Thinker handles it.
+    If FALLBACK was recommended or it is a "Late" stage task, the Manager takes over.
+    Current subtask: {current_subtask}
+  expected_output: >-
+    The technical result or code for the specific subtask.
+  agent: thinker
+
+final_verification:
+  description: >-
+    Review the entire project output for the request: "{user_request}"
+    Ensure all subtasks are integrated and the HERA strategy was followed.
+  expected_output: >-
+    A final status report and the completed codebase/document.
+  agent: manager

@@ -1,0 +1,33 @@
+# Centralized LLM configuration for MyHeraCrew project
+
+default_ollama_base_url: "http://localhost:11434"
+
+# HERA Strategy Models (Used in crew.py)
+hera:
+  manager:
+    model: "ollama_chat/deepseek-r1:14b"
+    timeout: 120
+  thinker:
+    model: "ollama_chat/gemma3:latest"
+    timeout: 60
+  critic:
+    model: "ollama_chat/phi4:latest"
+    timeout: 90
+
+# General Crew Models (Used in mcp_crew_server.py)
+general:
+  analyst:
+    model: "ollama/phi4"
+    timeout: 90
+  specialist:
+    model: "ollama/qwen2.5-coder:7b"
+    timeout: 60
+  reviewer:
+    model: "ollama/deepseek-r1:14b"
+    timeout: 120
+  planner:
+    model: "ollama/qwen3.5:9b"
+    timeout: 90
+  coder:
+    model: "ollama/deepseek-coder"
+    timeout: 60
