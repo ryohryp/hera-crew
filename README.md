@@ -48,23 +48,23 @@
 ### 構成図 (Architecture Diagram)
 
 ```mermaid
-graph TD
-    subgraph "Cloud (Google Antigravity)"
+flowchart TD
+    subgraph cloud ["Cloud (Google Antigravity)"]
         A[Cloud LLM / Commander]
     end
 
-    subgraph "Edge (Local PC: my_hera_crew)"
+    subgraph edge ["Edge (Local PC: my_hera_crew)"]
         B[MCP Server]
         C[CrewAI Orchestrator]
         
-        subgraph "Local LLM Experts (Ollama)"
+        subgraph experts ["Local LLM Experts (Ollama)"]
             D[Planner: Qwen2.5 14B]
             E[Reviewer: DeepSeek-R1 14B]
             F[Coder: Qwen2.5-Coder 14B]
         end
     end
 
-    A <-->|Model Context Protocol| B
+    A <--> |Model Context Protocol| B
     B <--> C
     C --> D
     C --> E
