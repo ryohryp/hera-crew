@@ -1,271 +1,218 @@
-# HERA: Hybrid Edge-cloud Resource Allocation Multi-Agent System
+# HERA: Hybrid Edge-cloud Resource Allocation
 
 ![HERA Banner](https://img.shields.io/badge/Strategy-HERA-blueviolet?style=for-the-badge)
 ![CrewAI](https://img.shields.io/badge/Framework-CrewAI-red?style=for-the-badge)
 ![Ollama](https://img.shields.io/badge/Local_LLM-Ollama-orange?style=for-the-badge)
 ![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)
 
-## 1. 概要 (System Overview)
+> [日本語版はこちら](README_ja.md)
 
-本システムは、**HERA（Hybrid Edge-cloud Resource Allocation）戦略**に基づき、クラウドLLMとローカルLLM（Ollama）を動的に使い分ける自律型AIマルチエージェントチームです。
+A local-first, multi-agent AI system built on [CrewAI](https://github.com/crewAIInc/crewAI) and [Ollama](https://ollama.com/).
+Run powerful 14B-class models entirely on your own GPU — no cloud API required.
+When you need it, plug in Gemini or any other cloud LLM with a single `.env` change.
 
-ローカルPCのGPUパワーを最大限に活用し、コスト効率と高度な推論能力を両立させます。CrewAI フレームワークを基盤とし、MCPサーバーとしても動作可能です。
+---
 
-## 2. システムの特徴 (Key Features)
+## Why HERA?
 
-*   **HERA 戦略によるリソース最適化**: 全てのタスクをクラウドに投げるのではなく、初期の分析やドラフト作成をローカル（Ollama）で行い、最終的な統合や高度な推論のみをクラウド（Gemini 等）または強力なローカルモデル（DeepSeek-R1 等）に割り振ります。
-*   **APIコストの劇的な削減**: 試行錯誤の段階（Thinker/Critic のループ）をローカルで完結させるため、クラウドLLMのトークン消費を最小限に抑えられます。
-*   **マルチエージェントによる品質担保**: 単一のLLMではなく、役割の異なる3つのエージェント（Thinker, Critic, Manager）が相互に検証・補完し合うことで、ハルシネーションの抑制と出力品質の向上を実現しています。
-*   **プライバシーとセキュリティ**: 重要なデータを含む初期調査やコードの下書きをローカル環境で処理できるため、不用意なデータ流出を抑えられます。
-*   **拡張性の高い MCP 対応**: 単体で動くだけでなく、MCPサーバーとして起動することで、Claude Desktop や Cursor などの使い慣れたエディタから「高度なタスク解決ツール」として呼び出すことができます。
+Most AI workflows default to cloud APIs for every call. HERA flips that default:
 
-## 3. 想定利用シーン (Target Audience & Use Cases)
+- **Thinker** (Gemma 3) — decomposes tasks and writes first drafts locally
+- **Critic** (Phi-4) — reviews and catches hallucinations locally
+- **Manager** (Qwen2.5 14B) — orchestrates, validates, and escalates to cloud only when needed
 
-### ターゲットユーザー
-*   **ローカルGPU（VRAM 16GB以上推奨）を持つ開発者**: 自宅のPCリソースを腐らせず、賢く開発に活用したい方。
-*   **APIコストを抑えたいプロフェッショナル**: 頻繁にAIとペアプログラミングを行うが、コストパフォーマンスも重視したい方。
-*   **プライバシー重視の開発者**: 未公開のソースコードや機密情報を含む調査を、可能な限り手元の環境で処理したい方。
+The result: the expensive cloud token budget is spent only on work that actually needs it.
 
-### 具体的な利用シーン
-*   **複雑なプログラミングタスクの自動化**: 「ディレクトリ構成の設計 → 各ファイルの雛形作成 → ロジックの検証」といった一連の流れを自律的に実行させたい場合。
-*   **技術調査とドキュメント作成**: 膨大なリサーチが必要なタスクを Thinker に分散させ、Manager に要約させることで、リサーチ時間を短縮したい場合。
-*   **AIエディタの機能拡張**: Cursor や Claude 等で、「この機能の実装プランを作って実行して」と指示した際に、HERA がバックグラウンドで緻密な検討を行い、完成度の高いコードを提案する。
+| Concern | HERA answer |
+|---|---|
+| API cost | Iterative thinking stays local |
+| Privacy | Drafts never leave your machine |
+| Quality | 3-agent cross-review catches errors |
+| Flexibility | Swap any model in one line of `.env` |
 
-## 4. システムアーキテクチャ (System Architecture)
+---
 
-タスクの性質に応じて、以下のエージェントが連携します：
+## Key Features
 
-1.  **Orchestrator / Manager** (デフォルト: Qwen2.5 14B):
-    *   全体計画の策定、タスクの委任、最終成果物の検証。
-    *   `antigravity_delegate_tool` によるクラウドチームへの委譲も担う。
-    *   ツール呼び出しが必要なため、function calling 対応モデルを使用。
-    *   `function_calling_llm` として同モデルを設定済み（推論用とツール用を分離可能）。
-2.  **Bridge / Thinker** (デフォルト: Gemma 3):
-    *   タスクの細分化、翻訳、初期コードのドラフト作成、一次調査。
-    *   クラウドAPIを消費せず、ローカル環境で迅速に思考を実行。
-3.  **The Critic** (デフォルト: Phi-4):
-    *   Thinkerの出力を厳格にレビューし、ハルシネーションを防止。
-    *   ローカルでの「収束」が困難な場合、Managerへのフォールバックを推奨。
+- **HERA resource strategy** — dynamic local/cloud routing per task
+- **MCP server mode** — expose the crew as a tool to Claude Desktop, Cursor, etc.
+- **Centralized LLM config** — one `llms.yaml` controls every model; `.env` overrides per-run
+- **32k context window** — `num_ctx: 32768` applied to all Ollama calls via `extra_body`
+- **Zero OpenAI dependency** — fully offline by default; no `OPENAI_API_KEY` required
 
-### 構成図 (Architecture Diagram)
+---
 
-> [!TIP]
-> 構成図が正しく表示されない場合は、[ARCHITECTURE.md](file:///i:/04_develop/my_hera_crew/ARCHITECTURE.md) を直接参照してください。
+## Architecture
 
 ```mermaid
 graph TD
-    subgraph "Cloud (Google Antigravity / Commander)"
-        A[Cloud LLM / Commander]
+    subgraph "Cloud (optional)"
+        A[Cloud LLM e.g. Gemini]
     end
 
-    subgraph "Edge (Local PC: my_hera_crew)"
-        B[MCP Server]
+    subgraph "Local PC"
+        B[MCP Server<br/>mcp_crew_server.py]
         C[CrewAI Orchestrator]
-        
-        subgraph "Local LLM Experts (Ollama 14B)"
-            D[Planner]
-            E[Critic]
-            F[Coder]
+
+        subgraph "Ollama 14B models"
+            D[Thinker: Gemma 3]
+            E[Critic: Phi-4]
+            F[Manager: Qwen2.5 14B]
         end
     end
 
-    A <-->|Model Context Protocol| B
+    A <-->|MCP| B
     B <--> C
     C --> D
     C --> E
     C --> F
 ```
 
-## 5. ディレクトリ構成 (Project Structure)
+See [ARCHITECTURE.md](ARCHITECTURE.md) for details.
+
+---
+
+## Project Structure
 
 ```text
 my_hera_crew/
-├── .env.example                # 環境変数テンプレート
-├── .gitignore                  # Git除外設定
-├── LICENSE                     # MITライセンス
-├── README.md                   # 本ドキュメント
-├── requirements.txt            # 依存ライブラリ
-├── mcp_crew_server.py          # MCPサーバー（外部ツール連携用）
-├── mcp_settings_example.json   # MCPクライアント用設定例 [NEW]
-├── scripts/                    # 補助・調査用スクリプト [Refactored]
+├── .env.example                # Environment variable template
+├── mcp_settings_example.json   # MCP client config example
+├── mcp_crew_server.py          # MCP server entry point
+├── requirements.txt
+├── scripts/
 │   └── inspect_llm.py
-├── tests/                      # テスト用スクリプト [Refactored]
+├── tests/
 │   ├── test_delegation.py
 │   └── test_llm_syntax.py
-└── src/
-    └── my_hera_crew/
-        ├── __init__.py
-        ├── config/
-        │   ├── agents.yaml     # エージェント役割定義
-        │   ├── llms.yaml       # LLMモデル設定（集中管理）
-        │   └── tasks.yaml      # タスク・ルーティング定義
-        ├── tools/
-        │   └── antigravity_delegate.py  # 外部エージェント委譲ツール
-        ├── crew.py             # CrewAI初期化 & LLM設定
-        └── main.py             # 実行用エントリーポイント
+└── src/my_hera_crew/
+    ├── config/
+    │   ├── agents.yaml         # Agent role definitions
+    │   ├── llms.yaml           # Centralized model config
+    │   └── tasks.yaml          # Task routing definitions
+    ├── tools/
+    │   └── antigravity_delegate.py
+    ├── crew.py
+    └── main.py
 ```
 
-## 6. セットアップ (Setup)
+---
 
-### 必須要件
+## Requirements
 
-*   Python 3.10 ~ 3.13
-*   [Ollama](https://ollama.com/) がインストールされていること
-*   GPU（推奨: VRAM 16GB以上）
+- Python 3.10 – 3.13
+- [Ollama](https://ollama.com/) installed and running
+- GPU recommended (VRAM 16 GB+ for all 14B models simultaneously)
 
-### インストール
+---
+
+## Setup
 
 ```bash
-# リポジトリのクローン
 git clone https://github.com/ryohryp/my_hera_crew.git
 cd my_hera_crew
 
-# 仮想環境のセットアップ
 python -m venv venv
-source venv/bin/activate      # Linux/macOS
-# venv\Scripts\activate       # Windows
+source venv/bin/activate        # Windows: venv\Scripts\activate
 
-# 依存関係のインストール
 pip install -r requirements.txt
 
-# 環境変数の設定
 cp .env.example .env
-# 必要に応じて .env を編集
+# Edit .env if needed
 ```
 
-### ローカルモデルの準備
-
-Ollamaで必要なモデルを取得しておきます。14Bクラスのモデルセット（VRAM 16GB〜推奨）が安定性と性能のバランスが良く推奨されます。
+Pull the required Ollama models:
 
 ```bash
-# HERA クルー用モデル（crew.py / main.py）
-ollama pull qwen2.5:14b        # Manager（ツール呼び出し対応）
-ollama pull gemma3:latest      # Thinker（タスク分解・ドラフト）
-ollama pull phi4:latest        # Critic（品質評価・検証）
+# HERA crew (main.py)
+ollama pull qwen2.5:14b         # Manager — must support function calling
+ollama pull gemma3:latest       # Thinker
+ollama pull phi4:latest         # Critic
 
-# MCPサーバー用モデル（mcp_crew_server.py）
-ollama pull qwen2.5:14b        # Analyst / Planner（兼用）
-ollama pull deepseek-r1:14b    # Reviewer（深い推論が必要な検証）
-ollama pull qwen2.5-coder:14b  # Specialist / Coder（コード特化）
+# MCP server (mcp_crew_server.py)
+ollama pull qwen2.5-coder:14b   # Specialist / Coder
+ollama pull deepseek-r1:14b     # Reviewer
 ```
 
-## 7. 実行方法 (Usage)
+---
 
-本システムは、CLIから直接実行する**スタンドアロンモード**と、他のクライアント（Claude DesktopやCursorなど）からタスク委譲ツールとして呼び出せる**MCPサーバーモード**の2種類の実行方法を提供しています。
+## Usage
 
-### 1. スタンドアロン実行 (CLI モード)
-
-ローカルで直接スクリプトを実行し、インタラクティブにタスク内容を入力して処理させる方法です。
+### Standalone CLI
 
 ```bash
 python src/my_hera_crew/main.py
 ```
 
-**実行フロー:**
-1. スクリプトを起動するとプロンプト（`Please enter your development task`）が表示されます。
-2. 実行したいタスク（例: 「Pythonで簡易的なスクレイピングツールを作成して」）を入力します。
-3. まず **Thinker (Gemma 3)** がタスクを小さなステップに細分化し、技術的なドラフトを作成します。
-4. **Critic (Phi-4)** がその内容を評価し、破綻がないかチェックします。
-5. 最後に **Manager (Qwen2.5 14B)** が全体の統合と検証を行い、ターミナル上に最終的な成果物を出力します。必要に応じて `antigravity_delegate_tool` でクラウドチームに委譲します。
+Enter your task at the prompt. The crew runs sequentially:
+Thinker → Critic → Manager → final output.
 
----
-
-### 2. MCPサーバーとして使用 (外部ツール連携)
-
-本システムを [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) サーバーとして起動し、外部のAIアシスタントに高度なタスク解決ツールを提供する方法です。
+### MCP Server
 
 ```bash
-# FastMCP を使用し、標準入出力 (stdio) 経由でサーバーとして待機します
 python mcp_crew_server.py
 ```
 
-**利用できるようになるツール:**
-*   `delegate_task(task_description: str)`
-    *   **概要:** 与えられたタスクを、「分析（Analyst）」「実行（Specialist）」「レビュー（Reviewer）」の3段階からなるエージェントチームに丸投げして処理させます。
-    *   **用途:** フロントのAIが行うのが難しい複雑なコード生成や調査を、ローカルのLLMチームにオフロードしたい場合に使用します。
+Add to your MCP client config (e.g. Claude Desktop `claude_desktop_config.json`):
 
-**MCPクライアント（Claude Desktop等）の設定例:**
 ```json
 {
   "mcpServers": {
     "my_hera_crew": {
-      "command": "絶対パス/my_hera_crew/venv/Scripts/python",
-      "args": [
-        "絶対パス/my_hera_crew/mcp_crew_server.py"
-      ]
+      "command": "/absolute/path/to/venv/Scripts/python",
+      "args": ["/absolute/path/to/mcp_crew_server.py"]
     }
   }
 }
 ```
 
----
+This exposes a `delegate_task(task_description)` tool that offloads complex work to your local agent team.
 
-### 3. テストスクリプトの実行
-
-エージェントの連携が正しく行われるか手っ取り早く確認したい場合は、同梱されているテストスクリプトを実行してください。固定のタスクが実行されます。
+### Quick test
 
 ```bash
 python tests/test_delegation.py
 ```
-## 8. 設定のカスタマイズ (Customization)
-
-### ローカルモデルの変更方法
-
-本システムでは、用途に合わせて使用するLLMモデルを柔軟に変更できます。変更方法は「設定ファイルによる一元管理」と「環境変数によるクイックな上書き」の2種類があります。
-
-#### A. 設定ファイル (`src/my_hera_crew/config/llms.yaml`) を編集
-プロジェクト全体で使用するデフォルトモデルを変更する場合に適しています。
-
-```yaml
-# hera: メインの実行（main.py）で使用されるモデル
-# general: MCPサーバー（mcp_crew_server.py）で使用されるモデル
-hera:
-  manager:
-    model: "ollama/qwen2.5:14b"   # Ollamaのモデル名を指定（ollama/ プレフィックス必須）
-    timeout: 120
-  thinker:
-    model: "ollama/gemma3:latest"
-    timeout: 60
-  tool_calling:
-    model: "ollama/qwen2.5:14b"   # Manager のツール呼び出し専用モデル（function calling 対応必須）
-    timeout: 60
-```
-
-#### B. 環境変数 (`.env`) で上書き
-特定の実行時のみモデルを切り替えたい、あるいはAPIキーを必要とするクラウドLLM（Gemini等）を使用したい場合に適しています。
-
-```ini
-# .env ファイルに記述することで llms.yaml の設定よりも優先されます
-MANAGER_MODEL=ollama/qwen2.5:14b
-THINKER_MODEL=ollama/gemma3:latest
-CRITIC_MODEL=ollama/phi4:latest
-# クラウドモデルへの切り替え例
-# MANAGER_MODEL=gemini/gemini-1.5-pro
-```
-
-> [!WARNING]
-> **モデル名の指定ルール（重要）**
-> - Ollamaモデルを使用する場合: **`ollama/モデル名` のプレフィックスが必須**です。省略するとOllamaではなく本物のOpenAI APIへの接続を試みて認証エラーになります。
-> - クラウドモデルを使用する場合: `gemini/gemini-1.5-flash` のように `プロバイダー名/モデル名` で記述し、対応するAPIキー（`GOOGLE_API_KEY` 等）を `.env` に設定してください。
-> - **Manager には function calling 対応モデルを指定してください**（`deepseek-r1` 系はOllamaでのtool calling非対応）。
-
-### トラブルシューティング & Tips
-
-#### 14Bモデルで「物忘れ」を防ぐ (32k Context Window)
-マルチエージェントの議論が長くなると、デフォルトの 4k トークンでは記憶が足りなくなることがあります。本システムでは `extra_body={"num_ctx": 32768}` を指定しており、32kまでの長文コンテキストを安定して保持できます。
-
-#### OpenAI API 認証エラーの完全回避
-LiteLLM や CrewAI が内部的に OpenAI サーバーへ接続しようとして `invalid_api_key` エラーを出す場合があります。本プロジェクトでは以下の対策を適用済みです：
-- `.env` で `OPENAI_API_KEY=NA` を設定。
-- `llms.yaml` で `ollama/` プレフィックスを強制。
-- コード内で `api_key="NA"` をコンストラクタに明示的に渡す。
-
-これにより、完全オフライン／ローカル環境での動作を保証しています。
-
-## 9. ライセンス (License)
-
-本プロジェクトは [MIT License](LICENSE) の下で公開されています。
 
 ---
 
-**HERA: Hybrid Edge-cloud Resource Allocation for Autonomous Multi-Agent Development.**
+## Configuration
+
+### Swap models via `llms.yaml`
+
+```yaml
+hera:
+  manager:
+    model: "ollama/qwen2.5:14b"   # ollama/ prefix required
+    timeout: 300
+    num_ctx: 32768
+  thinker:
+    model: "ollama/gemma3:latest"
+  critic:
+    model: "ollama/phi4:latest"
+```
+
+### Override per-run via `.env`
+
+```ini
+MANAGER_MODEL=ollama/qwen2.5:14b
+THINKER_MODEL=ollama/gemma3:latest
+CRITIC_MODEL=ollama/phi4:latest
+
+# Switch to cloud:
+# MANAGER_MODEL=gemini/gemini-1.5-pro
+# GOOGLE_API_KEY=your_key
+```
+
+> **Note:** Always use the `ollama/` prefix for Ollama models. Without it, LiteLLM routes the request to OpenAI and fails.
+> **Note:** The Manager must use a function-calling-capable model (`deepseek-r1` does not support tool calling via Ollama).
+
+---
+
+## License
+
+[MIT](LICENSE)
+
+---
+
+*HERA: Hybrid Edge-cloud Resource Allocation for Autonomous Multi-Agent Development.*
