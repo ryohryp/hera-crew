@@ -35,13 +35,15 @@
 
 タスクの性質に応じて、以下のエージェントが連携します：
 
-1.  **Orchestrator / Manager** (例: DeepSeek-R1):
+1.  **Orchestrator / Manager** (デフォルト: Qwen2.5 14B):
     *   全体計画の策定、タスクの委任、最終成果物の検証。
-    *   高度な推論が必要な場合や進行度の後半（Late stage）で稼働。
-2.  **Bridge / Thinker** (例: Gemma 3):
+    *   `antigravity_delegate_tool` によるクラウドチームへの委譲も担う。
+    *   ツール呼び出しが必要なため、function calling 対応モデルを使用。
+    *   `function_calling_llm` として同モデルを設定済み（推論用とツール用を分離可能）。
+2.  **Bridge / Thinker** (デフォルト: Gemma 3):
     *   タスクの細分化、翻訳、初期コードのドラフト作成、一次調査。
     *   クラウドAPIを消費せず、ローカル環境で迅速に思考を実行。
-3.  **The Critic** (例: Phi-4):
+3.  **The Critic** (デフォルト: Phi-4):
     *   Thinkerの出力を厳格にレビューし、ハルシネーションを防止。
     *   ローカルでの「収束」が困難な場合、Managerへのフォールバックを推奨。
 
@@ -128,10 +130,15 @@ cp .env.example .env
 Ollamaで必要なモデルを取得しておきます。14Bクラスのモデルセット（VRAM 16GB〜推奨）が安定性と性能のバランスが良く推奨されます。
 
 ```bash
-# 14B 安定モデルセット
-ollama pull qwen2.5:14b        # プランナー用
-ollama pull deepseek-r1:14b    # レビュアー用
-ollama pull qwen2.5-coder:14b  # テックリード用
+# HERA クルー用モデル（crew.py / main.py）
+ollama pull qwen2.5:14b        # Manager（ツール呼び出し対応）
+ollama pull gemma3:latest      # Thinker（タスク分解・ドラフト）
+ollama pull phi4:latest        # Critic（品質評価・検証）
+
+# MCPサーバー用モデル（mcp_crew_server.py）
+ollama pull qwen2.5:14b        # Analyst / Planner（兼用）
+ollama pull deepseek-r1:14b    # Reviewer（深い推論が必要な検証）
+ollama pull qwen2.5-coder:14b  # Specialist / Coder（コード特化）
 ```
 
 ## 7. 実行方法 (Usage)
@@ -151,7 +158,7 @@ python src/my_hera_crew/main.py
 2. 実行したいタスク（例: 「Pythonで簡易的なスクレイピングツールを作成して」）を入力します。
 3. まず **Thinker (Gemma 3)** がタスクを小さなステップに細分化し、技術的なドラフトを作成します。
 4. **Critic (Phi-4)** がその内容を評価し、破綻がないかチェックします。
-5. 最後に **Manager (DeepSeek-R1)** が全体の統合と検証を行い、ターミナル上に最終的な成果物を出力します。
+5. 最後に **Manager (Qwen2.5 14B)** が全体の統合と検証を行い、ターミナル上に最終的な成果物を出力します。必要に応じて `antigravity_delegate_tool` でクラウドチームに委譲します。
 
 ---
 
@@ -206,10 +213,13 @@ python test_delegation.py
 # general: MCPサーバー（mcp_crew_server.py）で使用されるモデル
 hera:
   manager:
-    model: "ollama_chat/deepseek-r1:14b"  # Ollamaのモデル名を指定
-    timeout: 300
+    model: "ollama/qwen2.5:14b"   # Ollamaのモデル名を指定（ollama/ プレフィックス必須）
+    timeout: 120
   thinker:
-    model: "ollama_chat/gemma3:latest"
+    model: "ollama/gemma3:latest"
+    timeout: 60
+  tool_calling:
+    model: "ollama/qwen2.5:14b"   # Manager のツール呼び出し専用モデル（function calling 対応必須）
     timeout: 60
 ```
 
@@ -218,22 +228,23 @@ hera:
 
 ```ini
 # .env ファイルに記述することで llms.yaml の設定よりも優先されます
-MANAGER_MODEL=deepseek-r1:32b
-THINKER_MODEL=llama3.1:8b
+MANAGER_MODEL=ollama/qwen2.5:14b
+THINKER_MODEL=ollama/gemma3:latest
+CRITIC_MODEL=ollama/phi4:latest
 # クラウドモデルへの切り替え例
 # MANAGER_MODEL=gemini/gemini-1.5-pro
 ```
 
-> [!TIP]
-> **モデル名の指定ルール**
-> - Ollamaモデルを使用する場合: `ollama_chat/モデル名` または `ollama/モデル名` と記述します。
+> [!WARNING]
+> **モデル名の指定ルール（重要）**
+> - Ollamaモデルを使用する場合: **`ollama/モデル名` のプレフィックスが必須**です。省略するとOllamaではなく本物のOpenAI APIへの接続を試みて認証エラーになります。
 > - クラウドモデルを使用する場合: `gemini/gemini-1.5-flash` のように `プロバイダー名/モデル名` で記述し、対応するAPIキー（`GOOGLE_API_KEY` 等）を `.env` に設定してください。
+> - **Manager には function calling 対応モデルを指定してください**（`deepseek-r1` 系はOllamaでのtool calling非対応）。
 
 ### パフォーマンス最適化
 
 *   **並列実行設定**: `OLLAMA_NUM_PARALLEL` を環境変数で設定することで、Ollamaの並列処理数を調整できます（デフォルト: 4）。
-*   **タイムアウト調整**: `llms.yaml` の `timeout` 値を増やすことで、推論に時間がかかる巨大なモデル（DeepSeek-R1等）のタイムアウトエラーを回避できます。
-*   **コンテキスト窓の拡張 (32k)**: デフォルトでは `num_ctx: 32768` が適用されています。これにより、エージェント同士の深い議論や複雑な長文コードの生成においても、コンテキスト（記憶）を維持したまま処理を継続できます。
+*   **タイムアウト調整**: `llms.yaml` の `timeout` 値を増やすことで、推論に時間がかかる巨大なモデルのタイムアウトエラーを回避できます。
 *   **GPUの使用**: Ollama側で適切にGPUが認識されていれば、特別な設定なしで高速な推論が可能です。
 
 ## 9. ライセンス (License)
