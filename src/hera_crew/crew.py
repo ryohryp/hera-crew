@@ -1,18 +1,11 @@
-import os
-import yaml
-from pathlib import Path
-from dotenv import load_dotenv
-from crewai import Agent, Crew, LLM, Process, Task
+from crewai import Agent, Crew, Process, Task
 from crewai.project import CrewBase, agent, crew, task
+from hera_crew.utils.env_setup import setup_environment
+from hera_crew.utils.llm_factory import LLMFactory
 from .tools.antigravity_delegate import AntigravityDelegateTool
 
-# Load environment variables
-load_dotenv()
-
-# Prevent LiteLLM from failing due to missing OpenAI API Key and disable telemetry
-os.environ["OPENAI_API_KEY"] = "NA"
-os.environ["CREWAI_TELEMETRY"] = "false"
-os.environ["OTEL_SDK_DISABLED"] = "true"
+# Initialize environment
+setup_environment()
 
 @CrewBase
 class HeraCrew():
@@ -20,45 +13,15 @@ class HeraCrew():
 
     agents_config = 'config/agents.yaml'
     tasks_config = 'config/tasks.yaml'
-    llms_config = 'config/llms.yaml'
-
     def __init__(self) -> None:
-        # Load centralized LLM configurations
-        config_path = Path(__file__).parent / self.llms_config
-        with open(config_path, 'r', encoding='utf-8') as f:
-            llm_settings = yaml.safe_load(f)
-        
-        self.base_url = os.getenv("OLLAMA_BASE_URL", llm_settings.get("default_ollama_base_url"))
-        hera_llms = llm_settings.get("hera", {})
-        
-        # Setup each LLM with Environment Overrides
-        self.manager_llm = self._setup_llm(hera_llms.get('manager'), "MANAGER_MODEL")
-        self.thinker_llm = self._setup_llm(hera_llms.get('thinker'), "THINKER_MODEL")
-        self.critic_llm = self._setup_llm(hera_llms.get('critic'), "CRITIC_MODEL")
-        # Tool-calling LLM for manager: uses a function-calling-capable model
-        self.tool_calling_llm = self._setup_llm(hera_llms.get('tool_calling'), "TOOL_CALLING_MODEL")
+        # Setup each LLM using the centralized factory
+        self.manager_llm = LLMFactory.create_llm('hera', 'manager', "MANAGER_MODEL")
+        self.thinker_llm = LLMFactory.create_llm('hera', 'thinker', "THINKER_MODEL")
+        self.critic_llm = LLMFactory.create_llm('hera', 'critic', "CRITIC_MODEL")
+        self.tool_calling_llm = LLMFactory.create_llm('hera', 'tool_calling', "TOOL_CALLING_MODEL")
 
         # Tools
         self.antigravity_tool = AntigravityDelegateTool()
-
-    def _setup_llm(self, config: dict, env_var: str):
-        """Helper to initialize LLM with Environment Overrides and local/cloud detection."""
-        model = os.getenv(env_var, config.get('model'))
-        timeout = config.get('timeout', 120)
-        num_ctx = config.get('num_ctx', 32768)
-
-        if "ollama" in model.lower():
-            # Use extra_body to pass Ollama-specific params through LiteLLM's OpenAI bridge
-            # This ensures compatibility with CrewAI's Pydantic validation
-            return LLM(
-                model=model, 
-                base_url=self.base_url, 
-                timeout=timeout,
-                api_key="NA",
-                extra_body={"num_ctx": num_ctx}
-            )
-        else:
-            return LLM(model=model, timeout=timeout)
 
     @agent
     def manager(self) -> Agent:

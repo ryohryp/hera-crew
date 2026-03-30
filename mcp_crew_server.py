@@ -1,57 +1,30 @@
 import sys
 import os
-
-# Force UTF-8 for stdout/stderr to prevent encoding errors on Windows (cp932)
-if hasattr(sys.stdout, "reconfigure"):
-    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-if hasattr(sys.stderr, "reconfigure"):
-    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
-
-import yaml
 from pathlib import Path
 from dotenv import load_dotenv
 from mcp.server.fastmcp import FastMCP
 from crewai import Agent, LLM, Task, Crew
 
-load_dotenv()
+# Add 'src' directory to python path for modular imports
+src_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "src")
+if src_path not in sys.path:
+    sys.path.append(src_path)
 
-# Prevent LiteLLM from failing due to missing OpenAI API Key and disable telemetry
-os.environ["OPENAI_API_KEY"] = "NA"
-os.environ["CREWAI_TELEMETRY"] = "false"
-os.environ["OTEL_SDK_DISABLED"] = "true"
+from hera_crew.utils.env_setup import setup_environment
+from hera_crew.utils.llm_factory import LLMFactory
+
+# Initialize environment
+setup_environment()
 
 # 1. MCPサーバーの初期化
 mcp = FastMCP("hera-crew")
 
-# 2. 中央集権的なLLM設定の読み込み
-# llms.yaml のパスを解決
-config_path = Path(__file__).parent / "src" / "hera_crew" / "config" / "llms.yaml"
-with open(config_path, 'r', encoding='utf-8') as f:
-    llm_settings = yaml.safe_load(f)
-
-base_url = os.getenv("OLLAMA_BASE_URL", llm_settings.get("default_ollama_base_url"))
-gen_llms = llm_settings.get("general", {})
-
-def setup_local_llm(cfg):
-    model = cfg['model']
-    timeout = cfg.get('timeout', 120)
-    num_ctx = cfg.get('num_ctx', 32768)
-    if "ollama" in model.lower():
-        # Use extra_body to pass Ollama-specific params through LiteLLM's OpenAI bridge
-        return LLM(
-            model=model, 
-            base_url=base_url, 
-            timeout=timeout,
-            api_key="NA",
-            extra_body={"num_ctx": num_ctx}
-        )
-    return LLM(model=model, timeout=timeout)
-
-analyst_llm = setup_local_llm(gen_llms['analyst'])
-reviewer_llm = setup_local_llm(gen_llms['reviewer'])
-specialist_llm = setup_local_llm(gen_llms['specialist'])
-planner_llm = setup_local_llm(gen_llms['planner'])
-coder_llm = setup_local_llm(gen_llms['coder'])
+# 2. 中央集権的なLLM設定の読み込みとインスタンス化
+analyst_llm = LLMFactory.create_llm('general', 'analyst')
+reviewer_llm = LLMFactory.create_llm('general', 'reviewer')
+specialist_llm = LLMFactory.create_llm('general', 'specialist')
+planner_llm = LLMFactory.create_llm('general', 'planner')
+coder_llm = LLMFactory.create_llm('general', 'coder')
 
 # 3. Antigravityから呼び出せるツールの定義
 @mcp.tool()
