@@ -147,29 +147,48 @@ python test_delegation.py
 ```
 ## 6. 設定のカスタマイズ
 
-### LLMモデルの変更
+## 6. 設定のカスタマイズ
 
-`src/my_hera_crew/config/llms.yaml` でモデルを一元管理しています。  
-環境変数（`.env`）でオーバーライドも可能です。
+### ローカルモデルの変更方法
+
+本システムでは、用途に合わせて使用するLLMモデルを柔軟に変更できます。変更方法は「設定ファイルによる一元管理」と「環境変数によるクイックな上書き」の2種類があります。
+
+#### A. 設定ファイル (`src/my_hera_crew/config/llms.yaml`) を編集
+プロジェクト全体で使用するデフォルトモデルを変更する場合に適しています。
 
 ```yaml
-# llms.yaml の例
+# hera: メインの実行（main.py）で使用されるモデル
+# general: MCPサーバー（mcp_crew_server.py）で使用されるモデル
 hera:
   manager:
-    model: "ollama_chat/deepseek-r1:14b"   # 任意のOllamaモデルに変更可
+    model: "ollama_chat/deepseek-r1:14b"  # Ollamaのモデル名を指定
     timeout: 300
+  thinker:
+    model: "ollama_chat/gemma3:latest"
+    timeout: 60
 ```
 
+#### B. 環境変数 (`.env`) で上書き
+特定の実行時のみモデルを切り替えたい、あるいはAPIキーを必要とするクラウドLLM（Gemini等）を使用したい場合に適しています。
+
 ```ini
-# .env でのオーバーライド
-MANAGER_MODEL=gemini/gemini-1.5-flash  # クラウドLLMへの切替も可能
+# .env ファイルに記述することで llms.yaml の設定よりも優先されます
+MANAGER_MODEL=deepseek-r1:32b
+THINKER_MODEL=llama3.1:8b
+# クラウドモデルへの切り替え例
+# MANAGER_MODEL=gemini/gemini-1.5-pro
 ```
+
+> [!TIP]
+> **モデル名の指定ルール**
+> - Ollamaモデルを使用する場合: `ollama_chat/モデル名` または `ollama/モデル名` と記述します。
+> - クラウドモデルを使用する場合: `gemini/gemini-1.5-flash` のように `プロバイダー名/モデル名` で記述し、対応するAPIキー（`GOOGLE_API_KEY` 等）を `.env` に設定してください。
 
 ### パフォーマンス最適化
 
-*   **Parallel Execution**: `OLLAMA_NUM_PARALLEL` を環境変数で設定（デフォルト: 4）
-*   **Context Window**: `llms.yaml` でモデルごとに `timeout` を調整
-*   **GPU Acceleration**: Ollama がGPUを自動検出（NVIDIA CUDA / AMD ROCm 対応）
+*   **並列実行設定**: `OLLAMA_NUM_PARALLEL` を環境変数で設定することで、Ollamaの並列処理数を調整できます（デフォルト: 4）。
+*   **タイムアウト調整**: `llms.yaml` の `timeout` 値を増やすことで、推論に時間がかかる巨大なモデル（DeepSeek-R1等）のタイムアウトエラーを回避できます。
+*   **GPUの使用**: Ollama側で適切にGPUが認識されていれば、特別な設定なしで高速な推論が可能です。
 
 ## 7. ライセンス (License)
 
