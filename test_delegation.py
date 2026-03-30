@@ -8,6 +8,11 @@ if src_path not in sys.path:
 
 from my_hera_crew.crew import MyHeraCrew
 
+# Environmental overrides for testing
+os.environ["OPENAI_API_KEY"] = "NA"
+os.environ["OPENAI_API_BASE"] = "http://localhost:11434/v1"
+os.environ["OLLAMA_HOST"] = "http://localhost:11434"
+
 def test_run():
     user_request = "宇宙物理学に基づき、一般相対性理論を考慮した人工衛星の軌道シミュレータを実装せよ。数値積分にはRunge-Kutta法を使用し、PyTorchでの高速化も検討すること。"
     

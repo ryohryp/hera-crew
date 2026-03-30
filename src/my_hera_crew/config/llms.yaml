@@ -5,31 +5,41 @@ default_ollama_base_url: "http://localhost:11434"
 # HERA Strategy Models (Used in crew.py)
 hera:
   manager:
-    # Set to deepseek-r1:14b (Default Local Power)
-    # To use Gemini, change to "gemini/gemini-1.5-flash"
-    model: "ollama_chat/deepseek-r1:14b"
-    timeout: 300  # R1 models think longer
+    model: "ollama/deepseek-r1:14b"
+    timeout: 300
+    num_ctx: 32768
   thinker:
-    model: "ollama_chat/gemma3:latest"
+    model: "ollama/gemma3:latest"
     timeout: 60
+    num_ctx: 32768
   critic:
-    model: "ollama_chat/phi4:latest"
+    model: "ollama/phi4:latest"
     timeout: 90
+    num_ctx: 32768
+  tool_calling:
+    model: "ollama/qwen2.5:14b"
+    timeout: 60
+    num_ctx: 8192
 
 # General Crew Models (Used in mcp_crew_server.py)
 general:
   analyst:
     model: "ollama/qwen2.5:14b"
     timeout: 120
+    num_ctx: 32768
   specialist:
     model: "ollama/qwen2.5-coder:14b"
     timeout: 120
+    num_ctx: 32768
   reviewer:
     model: "ollama/deepseek-r1:14b"
-    timeout: 300  # R1は推論時間がかかるため長めに設定
+    timeout: 300
+    num_ctx: 32768
   planner:
     model: "ollama/qwen2.5:14b"
     timeout: 120
+    num_ctx: 32768
   coder:
     model: "ollama/qwen2.5-coder:14b"
     timeout: 120
+    num_ctx: 32768

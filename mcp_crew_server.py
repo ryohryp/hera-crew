@@ -2,7 +2,11 @@ import os
 import yaml
 from pathlib import Path
 from mcp.server.fastmcp import FastMCP
-from crewai import Agent, Task, Crew, LLM
+from crewai import Agent, Task, Crew
+from langchain_community.llms import Ollama
+
+# Prevent LiteLLM from failing due to missing OpenAI API Key
+os.environ["OPENAI_API_KEY"] = "NA"
 
 # 1. MCPサーバーの初期化
 mcp = FastMCP("General_Autonomous_Crew")
@@ -16,31 +20,22 @@ with open(config_path, 'r', encoding='utf-8') as f:
 base_url = os.getenv("OLLAMA_BASE_URL", llm_settings.get("default_ollama_base_url"))
 gen_llms = llm_settings.get("general", {})
 
-analyst_llm = LLM(
-    model=gen_llms['analyst']['model'], 
-    base_url=base_url,
-    timeout=gen_llms['analyst']['timeout']
-)
-reviewer_llm = LLM(
-    model=gen_llms['reviewer']['model'], 
-    base_url=base_url,
-    timeout=gen_llms['reviewer']['timeout']
-)
-specialist_llm = LLM(
-    model=gen_llms['specialist']['model'], 
-    base_url=base_url,
-    timeout=gen_llms['specialist']['timeout']
-)
-planner_llm = LLM(
-    model=gen_llms['planner']['model'], 
-    base_url=base_url,
-    timeout=gen_llms['planner']['timeout']
-)
-coder_llm = LLM(
-    model=gen_llms['coder']['model'], 
-    base_url=base_url,
-    timeout=gen_llms['coder']['timeout']
-)
+# Helper for LangChain Ollama setup
+def setup_local_llm(cfg):
+    # Clean model string for LangChain
+    clean_model = cfg['model'].replace("ollama/", "").replace("ollama_chat/", "")
+    return Ollama(
+        model=clean_model,
+        base_url=base_url,
+        timeout=cfg.get('timeout', 120),
+        num_ctx=cfg.get('num_ctx', 32768)
+    )
+
+analyst_llm = setup_local_llm(gen_llms['analyst'])
+reviewer_llm = setup_local_llm(gen_llms['reviewer'])
+specialist_llm = setup_local_llm(gen_llms['specialist'])
+planner_llm = setup_local_llm(gen_llms['planner'])
+coder_llm = setup_local_llm(gen_llms['coder'])
 
 # 3. Antigravityから呼び出せるツールの定義
 @mcp.tool()

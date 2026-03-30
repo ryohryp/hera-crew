@@ -2,12 +2,15 @@ import os
 import yaml
 from pathlib import Path
 from dotenv import load_dotenv
-from crewai import Agent, Crew, Process, Task, LLM
+from crewai import Agent, Crew, LLM, Process, Task
 from crewai.project import CrewBase, agent, crew, task
 from .tools.antigravity_delegate import AntigravityDelegateTool
 
 # Load environment variables
 load_dotenv()
+
+# Prevent LiteLLM from failing due to missing OpenAI API Key
+os.environ["OPENAI_API_KEY"] = "NA"
 
 @CrewBase
 class MyHeraCrew():
@@ -30,21 +33,20 @@ class MyHeraCrew():
         self.manager_llm = self._setup_llm(hera_llms.get('manager'), "MANAGER_MODEL")
         self.thinker_llm = self._setup_llm(hera_llms.get('thinker'), "THINKER_MODEL")
         self.critic_llm = self._setup_llm(hera_llms.get('critic'), "CRITIC_MODEL")
-        
+        # Tool-calling LLM for manager: uses a function-calling-capable model
+        self.tool_calling_llm = self._setup_llm(hera_llms.get('tool_calling'), "TOOL_CALLING_MODEL")
+
         # Tools
         self.antigravity_tool = AntigravityDelegateTool()
 
-    def _setup_llm(self, config: dict, env_var: str) -> LLM:
-        """Helper to initialize LLM with environment variable support and Cloud/Local detection."""
+    def _setup_llm(self, config: dict, env_var: str):
+        """Helper to initialize LLM with Environment Overrides and local/cloud detection."""
         model = os.getenv(env_var, config.get('model'))
         timeout = config.get('timeout', 120)
 
-        # Smart routing: Use base_url ONLY for Ollama models
         if "ollama" in model.lower():
             return LLM(model=model, base_url=self.base_url, timeout=timeout)
         else:
-            # For Gemini (e.g. "gemini/gemini-1.5-flash") or other cloud providers
-            # Make sure appropriate API keys (GOOGLE_API_KEY) are in .env
             return LLM(model=model, timeout=timeout)
 
     @agent
@@ -52,8 +54,9 @@ class MyHeraCrew():
         return Agent(
             config=self.agents_config['manager'],
             llm=self.manager_llm,
+            function_calling_llm=self.tool_calling_llm,
             verbose=True,
-            allow_delegation=True,
+            allow_delegation=False,
             tools=[self.antigravity_tool]
         )
 
