@@ -1,9 +1,19 @@
+import sys
 import os
+
+# Force UTF-8 for stdout/stderr to prevent encoding errors on Windows (cp932)
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+
 import yaml
 from pathlib import Path
+from dotenv import load_dotenv
 from mcp.server.fastmcp import FastMCP
-from crewai import Agent, Task, Crew
-from langchain_community.llms import Ollama
+from crewai import Agent, LLM, Task, Crew
+
+load_dotenv()
 
 # Prevent LiteLLM from failing due to missing OpenAI API Key
 os.environ["OPENAI_API_KEY"] = "NA"
@@ -20,16 +30,12 @@ with open(config_path, 'r', encoding='utf-8') as f:
 base_url = os.getenv("OLLAMA_BASE_URL", llm_settings.get("default_ollama_base_url"))
 gen_llms = llm_settings.get("general", {})
 
-# Helper for LangChain Ollama setup
 def setup_local_llm(cfg):
-    # Clean model string for LangChain
-    clean_model = cfg['model'].replace("ollama/", "").replace("ollama_chat/", "")
-    return Ollama(
-        model=clean_model,
-        base_url=base_url,
-        timeout=cfg.get('timeout', 120),
-        num_ctx=cfg.get('num_ctx', 32768)
-    )
+    model = cfg['model']
+    timeout = cfg.get('timeout', 120)
+    if "ollama" in model.lower():
+        return LLM(model=model, base_url=base_url, timeout=timeout)
+    return LLM(model=model, timeout=timeout)
 
 analyst_llm = setup_local_llm(gen_llms['analyst'])
 reviewer_llm = setup_local_llm(gen_llms['reviewer'])

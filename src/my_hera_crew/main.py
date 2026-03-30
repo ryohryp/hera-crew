@@ -1,5 +1,12 @@
 import sys
 import os
+
+# Force UTF-8 for stdout/stderr to prevent encoding errors on Windows (cp932)
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+
 from dotenv import load_dotenv
 
 # Add 'src' directory to python path for modular imports
