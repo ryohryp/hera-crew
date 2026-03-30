@@ -86,7 +86,12 @@ my_hera_crew/
 ├── README.md                   # 本ドキュメント
 ├── requirements.txt            # 依存ライブラリ
 ├── mcp_crew_server.py          # MCPサーバー（外部ツール連携用）
-├── test_delegation.py          # 委譲テストスクリプト
+├── mcp_settings_example.json   # MCPクライアント用設定例 [NEW]
+├── scripts/                    # 補助・調査用スクリプト [Refactored]
+│   └── inspect_llm.py
+├── tests/                      # テスト用スクリプト [Refactored]
+│   ├── test_delegation.py
+│   └── test_llm_syntax.py
 └── src/
     └── my_hera_crew/
         ├── __init__.py
@@ -200,7 +205,7 @@ python mcp_crew_server.py
 エージェントの連携が正しく行われるか手っ取り早く確認したい場合は、同梱されているテストスクリプトを実行してください。固定のタスクが実行されます。
 
 ```bash
-python test_delegation.py
+python tests/test_delegation.py
 ```
 ## 8. 設定のカスタマイズ (Customization)
 

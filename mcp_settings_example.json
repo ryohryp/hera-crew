@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "my_hera_crew": {
+      "command": "C:/path/to/my_hera_crew/venv/Scripts/python.exe",
+      "args": [
+        "C:/path/to/my_hera_crew/mcp_crew_server.py"
+      ],
+      "env": {
+        "OLLAMA_BASE_URL": "http://localhost:11434"
+      }
+    }
+  }
+}

@@ -1,6 +1,7 @@
 crewai[tools]
 langchain-community
 mcp
+fastmcp
 python-dotenv
 pyyaml
 pydantic
