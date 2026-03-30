@@ -125,12 +125,13 @@ cp .env.example .env
 
 ### ローカルモデルの準備
 
-Ollamaで必要なモデルを取得しておきます（`llms.yaml` の設定に従って変更可能）。
+Ollamaで必要なモデルを取得しておきます。14Bクラスのモデルセット（VRAM 16GB〜推奨）が安定性と性能のバランスが良く推奨されます。
 
 ```bash
-ollama pull deepseek-r1:14b
-ollama pull gemma3:latest
-ollama pull phi4:latest
+# 14B 安定モデルセット
+ollama pull qwen2.5:14b        # プランナー用
+ollama pull deepseek-r1:14b    # レビュアー用
+ollama pull qwen2.5-coder:14b  # テックリード用
 ```
 
 ## 7. 実行方法 (Usage)

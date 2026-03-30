@@ -19,17 +19,17 @@ hera:
 # General Crew Models (Used in mcp_crew_server.py)
 general:
   analyst:
-    model: "ollama/phi4"
-    timeout: 90
+    model: "ollama/qwen2.5:14b"
+    timeout: 120
   specialist:
-    model: "ollama/qwen2.5-coder:7b"
-    timeout: 60
+    model: "ollama/qwen2.5-coder:14b"
+    timeout: 120
   reviewer:
     model: "ollama/deepseek-r1:14b"
-    timeout: 120
+    timeout: 300  # R1は推論時間がかかるため長めに設定
   planner:
-    model: "ollama/qwen3.5:9b"
-    timeout: 90
+    model: "ollama/qwen2.5:14b"
+    timeout: 120
   coder:
-    model: "ollama/deepseek-coder"
-    timeout: 60
+    model: "ollama/qwen2.5-coder:14b"
+    timeout: 120
