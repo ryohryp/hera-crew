@@ -75,7 +75,7 @@ graph TD
 ## ディレクトリ構成
 
 ```text
-my_hera_crew/
+hera-crew/
 ├── .env.example                # 環境変数テンプレート
 ├── mcp_settings_example.json   # MCP クライアント設定例
 ├── mcp_crew_server.py          # MCP サーバー エントリーポイント
@@ -109,8 +109,8 @@ my_hera_crew/
 ## セットアップ
 
 ```bash
-git clone https://github.com/ryohryp/my_hera_crew.git
-cd my_hera_crew
+git clone https://github.com/ryohryp/hera-crew.git
+cd hera-crew
 
 python -m venv venv
 source venv/bin/activate        # Windows: venv\Scripts\activate
@@ -158,7 +158,7 @@ MCP クライアントの設定ファイル（例: Claude Desktop の `claude_de
 ```json
 {
   "mcpServers": {
-    "my_hera_crew": {
+    "hera-crew": {
       "command": "絶対パス/venv/Scripts/python",
       "args": ["絶対パス/mcp_crew_server.py"]
     }

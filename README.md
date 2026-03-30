@@ -75,7 +75,7 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for details.
 ## Project Structure
 
 ```text
-my_hera_crew/
+hera-crew/
 ├── .env.example                # Environment variable template
 ├── mcp_settings_example.json   # MCP client config example
 ├── mcp_crew_server.py          # MCP server entry point
@@ -109,8 +109,8 @@ my_hera_crew/
 ## Setup
 
 ```bash
-git clone https://github.com/ryohryp/my_hera_crew.git
-cd my_hera_crew
+git clone https://github.com/ryohryp/hera-crew.git
+cd hera-crew
 
 python -m venv venv
 source venv/bin/activate        # Windows: venv\Scripts\activate
@@ -158,7 +158,7 @@ Add to your MCP client config (e.g. Claude Desktop `claude_desktop_config.json`)
 ```json
 {
   "mcpServers": {
-    "my_hera_crew": {
+    "hera-crew": {
       "command": "/absolute/path/to/venv/Scripts/python",
       "args": ["/absolute/path/to/mcp_crew_server.py"]
     }
