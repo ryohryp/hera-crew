@@ -1,4 +1,4 @@
-# Centralized LLM configuration for MyHeraCrew project
+# Centralized LLM configuration for HeraCrew project
 
 default_ollama_base_url: "http://localhost:11434"
 

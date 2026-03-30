@@ -85,7 +85,7 @@ hera-crew/
 ├── tests/
 │   ├── test_delegation.py
 │   └── test_llm_syntax.py
-└── src/my_hera_crew/
+└── src/hera_crew/
     ├── config/
     │   ├── agents.yaml         # エージェント役割定義
     │   ├── llms.yaml           # LLM モデル集中管理
@@ -141,7 +141,7 @@ ollama pull deepseek-r1:14b     # Reviewer
 ### スタンドアロン CLI
 
 ```bash
-python src/my_hera_crew/main.py
+python src/hera_crew/main.py
 ```
 
 プロンプトにタスクを入力するだけです。クルーが順番に動作します：

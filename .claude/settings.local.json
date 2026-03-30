@@ -5,7 +5,15 @@
       "Bash(venv/Scripts/python -c \"import crewai; print\\(''crewai OK''\\); import dotenv; print\\(''dotenv OK''\\); import yaml; print\\(''yaml OK''\\)\")",
       "Bash(venv/Scripts/python -c \":*)",
       "Bash(curl -s http://localhost:11434/api/tags)",
-      "Bash(python -c \"import sys,json; data=json.load\\(sys.stdin\\); [print\\(m[''''name'''']\\) for m in data.get\\(''''models'''',[]\\)]\")"
+      "Bash(python -c \"import sys,json; data=json.load\\(sys.stdin\\); [print\\(m[''''name'''']\\) for m in data.get\\(''''models'''',[]\\)]\")",
+      "Bash(git config:*)",
+      "Bash(git remote:*)",
+      "Read(//c/Users/ryo/**)",
+      "Bash(find C:/Users/ryo/AppData/Roaming/ -name *mcp*)",
+      "Bash(find C:/Users/ryo/.windsurf* C:/Users/ryo/AppData/Roaming/Windsurf* -name *.json)",
+      "Bash(find C:/Users/ryo/AppData/Roaming/Antigravity/User/globalStorage/ -name *.json)",
+      "Bash(find C:/Users/ryo/AppData/Roaming/Antigravity/ -maxdepth 5 -name mcp*.json -o -name *mcp_settings*)",
+      "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(json.dumps\\(d, indent=2, ensure_ascii=False\\)\\)\")"
     ]
   }
 }

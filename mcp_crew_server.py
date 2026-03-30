@@ -21,11 +21,11 @@ os.environ["CREWAI_TELEMETRY"] = "false"
 os.environ["OTEL_SDK_DISABLED"] = "true"
 
 # 1. MCPサーバーの初期化
-mcp = FastMCP("General_Autonomous_Crew")
+mcp = FastMCP("hera-crew")
 
 # 2. 中央集権的なLLM設定の読み込み
 # llms.yaml のパスを解決
-config_path = Path(__file__).parent / "src" / "my_hera_crew" / "config" / "llms.yaml"
+config_path = Path(__file__).parent / "src" / "hera_crew" / "config" / "llms.yaml"
 with open(config_path, 'r', encoding='utf-8') as f:
     llm_settings = yaml.safe_load(f)
 

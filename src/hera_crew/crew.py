@@ -15,8 +15,8 @@ os.environ["CREWAI_TELEMETRY"] = "false"
 os.environ["OTEL_SDK_DISABLED"] = "true"
 
 @CrewBase
-class MyHeraCrew():
-    """MyHeraCrew crew representing the HERA strategy (Full Local Edition)"""
+class HeraCrew():
+    """HeraCrew crew representing the HERA strategy (Full Local Edition)"""
 
     agents_config = 'config/agents.yaml'
     tasks_config = 'config/tasks.yaml'
@@ -119,7 +119,7 @@ class MyHeraCrew():
 
     @crew
     def crew(self) -> Crew:
-        """Creates the MyHeraCrew crew"""
+        """Creates the HeraCrew crew"""
         return Crew(
             agents=self.agents,
             tasks=self.tasks,

@@ -8,11 +8,12 @@ if hasattr(sys.stderr, "reconfigure"):
     sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
 # Add 'src' directory to python path
-src_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "src")
+root_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+src_path = os.path.join(root_path, "src")
 if src_path not in sys.path:
     sys.path.append(src_path)
 
-from my_hera_crew.crew import MyHeraCrew
+from hera_crew.crew import HeraCrew
 
 # Environmental overrides for testing
 os.environ["OPENAI_API_KEY"] = "NA"
@@ -30,7 +31,7 @@ def test_run():
     
     print(f"Testing with request: {user_request}")
     try:
-        result = MyHeraCrew().crew().kickoff(inputs=inputs)
+        result = HeraCrew().crew().kickoff(inputs=inputs)
         print("\n\n########################")
         print("## TEST RESULT ##")
         print("########################\n")

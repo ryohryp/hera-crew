@@ -1,6 +1,6 @@
 # システムアーキテクチャ (Architecture)
 
-本プロジェクト `my_hera_crew` は、Google Antigravity (Cloud) と Ollama (Local) を組み合わせた、プライバシー重視かつ高効率なハイブリッド自律エージェント環境です。
+本プロジェクト `hera-crew` は、Google Antigravity (Cloud) と Ollama (Local) を組み合わせた、プライバシー重視かつ高効率なハイブリッド自律エージェント環境です。
 
 ## 構成図 (Herbal Edge Rendering Architecture)
 
@@ -11,8 +11,8 @@ graph TD
         G[Browser / Development Tools]
     end
 
-    subgraph "Edge (Local PC: my_hera_crew)"
-        B[MCP Server<br/>FastMCP / General_Autonomous_Crew]
+    subgraph "Edge (Local PC: hera-crew)"
+        B[MCP Server<br/>FastMCP / hera-crew]
         C[CrewAI Orchestrator<br/>Sequential/Manager Process]
         
         subgraph "Local LLM Experts (Ollama 14B + 32k ctx)"

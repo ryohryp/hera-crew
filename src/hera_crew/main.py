@@ -14,7 +14,7 @@ src_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if src_path not in sys.path:
     sys.path.append(src_path)
 
-from my_hera_crew.crew import MyHeraCrew
+from hera_crew.crew import HeraCrew
 
 def run():
     """
@@ -41,7 +41,7 @@ def run():
     }
     
     try:
-        result = MyHeraCrew().crew().kickoff(inputs=inputs)
+        result = HeraCrew().crew().kickoff(inputs=inputs)
         print("\n\n########################")
         print("## HERA FINAL OUTPUT ##")
         print("########################\n")

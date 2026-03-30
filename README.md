@@ -85,7 +85,7 @@ hera-crew/
 ├── tests/
 │   ├── test_delegation.py
 │   └── test_llm_syntax.py
-└── src/my_hera_crew/
+└── src/hera_crew/
     ├── config/
     │   ├── agents.yaml         # Agent role definitions
     │   ├── llms.yaml           # Centralized model config
@@ -141,7 +141,7 @@ ollama pull deepseek-r1:14b     # Reviewer
 ### Standalone CLI
 
 ```bash
-python src/my_hera_crew/main.py
+python src/hera_crew/main.py
 ```
 
 Enter your task at the prompt. The crew runs sequentially:
