@@ -89,20 +89,62 @@ ollama pull phi4:latest
 
 ## 5. 実行方法 (Usage)
 
-### スタンドアロン実行
+本システムは、CLIから直接実行する**スタンドアロンモード**と、他のクライアント（Claude DesktopやCursorなど）からタスク委譲ツールとして呼び出せる**MCPサーバーモード**の2種類の実行方法を提供しています。
+
+### 1. スタンドアロン実行 (CLI モード)
+
+ローカルで直接スクリプトを実行し、インタラクティブにタスク内容を入力して処理させる方法です。
 
 ```bash
 python src/my_hera_crew/main.py
 ```
 
-### MCPサーバーとして使用
+**実行フロー:**
+1. スクリプトを起動するとプロンプト（`Please enter your development task`）が表示されます。
+2. 実行したいタスク（例: 「Pythonで簡易的なスクレイピングツールを作成して」）を入力します。
+3. まず **Thinker (Gemma 3)** がタスクを小さなステップに細分化し、技術的なドラフトを作成します。
+4. **Critic (Phi-4)** がその内容を評価し、破綻がないかチェックします。
+5. 最後に **Manager (DeepSeek-R1)** が全体の統合と検証を行い、ターミナル上に最終的な成果物を出力します。
+
+---
+
+### 2. MCPサーバーとして使用 (外部ツール連携)
+
+本システムを [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) サーバーとして起動し、外部のAIアシスタントに高度なタスク解決ツールを提供する方法です。
 
 ```bash
+# FastMCP を使用し、標準入出力 (stdio) 経由でサーバーとして待機します
 python mcp_crew_server.py
 ```
 
-MCP経由で `delegate_task` ツールが利用可能になります。
+**利用できるようになるツール:**
+*   `delegate_task(task_description: str)`
+    *   **概要:** 与えられたタスクを、「分析（Analyst）」「実行（Specialist）」「レビュー（Reviewer）」の3段階からなるエージェントチームに丸投げして処理させます。
+    *   **用途:** フロントのAIが行うのが難しい複雑なコード生成や調査を、ローカルのLLMチームにオフロードしたい場合に使用します。
 
+**MCPクライアント（Claude Desktop等）の設定例:**
+```json
+{
+  "mcpServers": {
+    "my_hera_crew": {
+      "command": "絶対パス/my_hera_crew/venv/Scripts/python",
+      "args": [
+        "絶対パス/my_hera_crew/mcp_crew_server.py"
+      ]
+    }
+  }
+}
+```
+
+---
+
+### 3. テストスクリプトの実行
+
+エージェントの連携が正しく行われるか手っ取り早く確認したい場合は、同梱されているテストスクリプトを実行してください。固定のタスクが実行されます。
+
+```bash
+python test_delegation.py
+```
 ## 6. 設定のカスタマイズ
 
 ### LLMモデルの変更
