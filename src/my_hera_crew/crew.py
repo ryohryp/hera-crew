@@ -9,8 +9,10 @@ from .tools.antigravity_delegate import AntigravityDelegateTool
 # Load environment variables
 load_dotenv()
 
-# Prevent LiteLLM from failing due to missing OpenAI API Key
+# Prevent LiteLLM from failing due to missing OpenAI API Key and disable telemetry
 os.environ["OPENAI_API_KEY"] = "NA"
+os.environ["CREWAI_TELEMETRY"] = "false"
+os.environ["OTEL_SDK_DISABLED"] = "true"
 
 @CrewBase
 class MyHeraCrew():
@@ -43,9 +45,18 @@ class MyHeraCrew():
         """Helper to initialize LLM with Environment Overrides and local/cloud detection."""
         model = os.getenv(env_var, config.get('model'))
         timeout = config.get('timeout', 120)
+        num_ctx = config.get('num_ctx', 32768)
 
         if "ollama" in model.lower():
-            return LLM(model=model, base_url=self.base_url, timeout=timeout)
+            # Use extra_body to pass Ollama-specific params through LiteLLM's OpenAI bridge
+            # This ensures compatibility with CrewAI's Pydantic validation
+            return LLM(
+                model=model, 
+                base_url=self.base_url, 
+                timeout=timeout,
+                api_key="NA",
+                extra_body={"num_ctx": num_ctx}
+            )
         else:
             return LLM(model=model, timeout=timeout)
 

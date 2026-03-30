@@ -49,24 +49,27 @@
 
 ### 構成図 (Architecture Diagram)
 
+> [!TIP]
+> 構成図が正しく表示されない場合は、[ARCHITECTURE.md](file:///i:/04_develop/my_hera_crew/ARCHITECTURE.md) を直接参照してください。
+
 ```mermaid
-flowchart TD
-    subgraph cloud ["Cloud (Google Antigravity)"]
+graph TD
+    subgraph "Cloud (Google Antigravity / Commander)"
         A[Cloud LLM / Commander]
     end
 
-    subgraph edge ["Edge (Local PC: my_hera_crew)"]
+    subgraph "Edge (Local PC: my_hera_crew)"
         B[MCP Server]
         C[CrewAI Orchestrator]
         
-        subgraph experts ["Local LLM Experts (Ollama)"]
-            D[Planner: Qwen2.5 14B]
-            E[Reviewer: DeepSeek-R1 14B]
-            F[Coder: Qwen2.5-Coder 14B]
+        subgraph "Local LLM Experts (Ollama 14B)"
+            D[Planner]
+            E[Critic]
+            F[Coder]
         end
     end
 
-    A <--> |Model Context Protocol| B
+    A <-->|Model Context Protocol| B
     B <--> C
     C --> D
     C --> E
@@ -241,11 +244,18 @@ CRITIC_MODEL=ollama/phi4:latest
 > - クラウドモデルを使用する場合: `gemini/gemini-1.5-flash` のように `プロバイダー名/モデル名` で記述し、対応するAPIキー（`GOOGLE_API_KEY` 等）を `.env` に設定してください。
 > - **Manager には function calling 対応モデルを指定してください**（`deepseek-r1` 系はOllamaでのtool calling非対応）。
 
-### パフォーマンス最適化
+### トラブルシューティング & Tips
 
-*   **並列実行設定**: `OLLAMA_NUM_PARALLEL` を環境変数で設定することで、Ollamaの並列処理数を調整できます（デフォルト: 4）。
-*   **タイムアウト調整**: `llms.yaml` の `timeout` 値を増やすことで、推論に時間がかかる巨大なモデルのタイムアウトエラーを回避できます。
-*   **GPUの使用**: Ollama側で適切にGPUが認識されていれば、特別な設定なしで高速な推論が可能です。
+#### 14Bモデルで「物忘れ」を防ぐ (32k Context Window)
+マルチエージェントの議論が長くなると、デフォルトの 4k トークンでは記憶が足りなくなることがあります。本システムでは `extra_body={"num_ctx": 32768}` を指定しており、32kまでの長文コンテキストを安定して保持できます。
+
+#### OpenAI API 認証エラーの完全回避
+LiteLLM や CrewAI が内部的に OpenAI サーバーへ接続しようとして `invalid_api_key` エラーを出す場合があります。本プロジェクトでは以下の対策を適用済みです：
+- `.env` で `OPENAI_API_KEY=NA` を設定。
+- `llms.yaml` で `ollama/` プレフィックスを強制。
+- コード内で `api_key="NA"` をコンストラクタに明示的に渡す。
+
+これにより、完全オフライン／ローカル環境での動作を保証しています。
 
 ## 9. ライセンス (License)
 

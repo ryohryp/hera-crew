@@ -15,8 +15,10 @@ from crewai import Agent, LLM, Task, Crew
 
 load_dotenv()
 
-# Prevent LiteLLM from failing due to missing OpenAI API Key
+# Prevent LiteLLM from failing due to missing OpenAI API Key and disable telemetry
 os.environ["OPENAI_API_KEY"] = "NA"
+os.environ["CREWAI_TELEMETRY"] = "false"
+os.environ["OTEL_SDK_DISABLED"] = "true"
 
 # 1. MCPサーバーの初期化
 mcp = FastMCP("General_Autonomous_Crew")
@@ -33,8 +35,16 @@ gen_llms = llm_settings.get("general", {})
 def setup_local_llm(cfg):
     model = cfg['model']
     timeout = cfg.get('timeout', 120)
+    num_ctx = cfg.get('num_ctx', 32768)
     if "ollama" in model.lower():
-        return LLM(model=model, base_url=base_url, timeout=timeout)
+        # Use extra_body to pass Ollama-specific params through LiteLLM's OpenAI bridge
+        return LLM(
+            model=model, 
+            base_url=base_url, 
+            timeout=timeout,
+            api_key="NA",
+            extra_body={"num_ctx": num_ctx}
+        )
     return LLM(model=model, timeout=timeout)
 
 analyst_llm = setup_local_llm(gen_llms['analyst'])
