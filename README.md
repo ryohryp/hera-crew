@@ -31,7 +31,7 @@
 *   **技術調査とドキュメント作成**: 膨大なリサーチが必要なタスクを Thinker に分散させ、Manager に要約させることで、リサーチ時間を短縮したい場合。
 *   **AIエディタの機能拡張**: Cursor や Claude 等で、「この機能の実装プランを作って実行して」と指示した際に、HERA がバックグラウンドで緻密な検討を行い、完成度の高いコードを提案する。
 
-## 4. システムアーキテクチャ (HERA Strategy)
+## 4. システムアーキテクチャ (System Architecture)
 
 タスクの性質に応じて、以下のエージェントが連携します：
 
@@ -45,7 +45,33 @@
     *   Thinkerの出力を厳格にレビューし、ハルシネーションを防止。
     *   ローカルでの「収束」が困難な場合、Managerへのフォールバックを推奨。
 
-## 3. ディレクトリ構成 (Project Structure)
+### 構成図 (Architecture Diagram)
+
+```mermaid
+graph TD
+    subgraph "Cloud (Google Antigravity)"
+        A[Cloud LLM / Commander]
+    end
+
+    subgraph "Edge (Local PC: my_hera_crew)"
+        B[MCP Server]
+        C[CrewAI Orchestrator]
+        
+        subgraph "Local LLM Experts (Ollama)"
+            D[Planner: Qwen2.5 14B]
+            E[Reviewer: DeepSeek-R1 14B]
+            F[Coder: Qwen2.5-Coder 14B]
+        end
+    end
+
+    A <-->|Model Context Protocol| B
+    B <--> C
+    C --> D
+    C --> E
+    C --> F
+```
+
+## 5. ディレクトリ構成 (Project Structure)
 
 ```text
 my_hera_crew/
@@ -69,7 +95,7 @@ my_hera_crew/
         └── main.py             # 実行用エントリーポイント
 ```
 
-## 4. セットアップ (Setup)
+## 6. セットアップ (Setup)
 
 ### 必須要件
 
@@ -107,7 +133,7 @@ ollama pull gemma3:latest
 ollama pull phi4:latest
 ```
 
-## 5. 実行方法 (Usage)
+## 7. 実行方法 (Usage)
 
 本システムは、CLIから直接実行する**スタンドアロンモード**と、他のクライアント（Claude DesktopやCursorなど）からタスク委譲ツールとして呼び出せる**MCPサーバーモード**の2種類の実行方法を提供しています。
 
@@ -165,9 +191,7 @@ python mcp_crew_server.py
 ```bash
 python test_delegation.py
 ```
-## 6. 設定のカスタマイズ
-
-## 6. 設定のカスタマイズ
+## 8. 設定のカスタマイズ (Customization)
 
 ### ローカルモデルの変更方法
 
@@ -210,7 +234,7 @@ THINKER_MODEL=llama3.1:8b
 *   **タイムアウト調整**: `llms.yaml` の `timeout` 値を増やすことで、推論に時間がかかる巨大なモデル（DeepSeek-R1等）のタイムアウトエラーを回避できます。
 *   **GPUの使用**: Ollama側で適切にGPUが認識されていれば、特別な設定なしで高速な推論が可能です。
 
-## 7. ライセンス (License)
+## 9. ライセンス (License)
 
 本プロジェクトは [MIT License](LICENSE) の下で公開されています。
 
