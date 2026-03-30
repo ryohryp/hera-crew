@@ -1,7 +1,11 @@
 {
   "permissions": {
     "allow": [
-      "Bash(python -c \":*)"
+      "Bash(python -c \":*)",
+      "Bash(venv/Scripts/python -c \"import crewai; print\\(''crewai OK''\\); import dotenv; print\\(''dotenv OK''\\); import yaml; print\\(''yaml OK''\\)\")",
+      "Bash(venv/Scripts/python -c \":*)",
+      "Bash(curl -s http://localhost:11434/api/tags)",
+      "Bash(python -c \"import sys,json; data=json.load\\(sys.stdin\\); [print\\(m[''''name'''']\\) for m in data.get\\(''''models'''',[]\\)]\")"
     ]
   }
 }
