@@ -2,38 +2,34 @@
 
 task_decomposition:
   description: >-
-    Decompose the user request: "{user_request}" into detailed subtasks. 
-    Each subtask must be a technical instruction (Manifest) that even a 
-    smaller model can understand.
+    ユーザーのリクエスト: "{user_request}" を詳細なサブタスクに分解してください。
+    各サブタスクは、小規模なモデルでも理解できる技術的な指示（マニフェスト）である必要があります。
   expected_output: >-
-    A list of specific, actionable subtasks formatted as a technical manifest.
+    日本語で記述された、具体的で実行可能なサブタスクのリスト（テクニカル・マニフェスト形式）。
   agent: thinker
 
 logic_evaluation:
   description: >-
-    Evaluate if the subtasks provided in the previous task output can be solved 
-    locally by Gemma 3 with high confidence.
-    Review the manifest from the previous step and assess the complexity 
-    and potential for divergence.
+    前段階のタスク出力で提供されたサブタスクが、Gemma 3 によってローカルで高い信頼性を持って解決できるかどうかを評価してください。
+    これまでのステップのマニフェストを確認し、複雑さと発散の可能性を評価します。
   expected_output: >-
-    A routing recommendation (LOCAL or FALLBACK) for each subtask.
+    各サブタスクに対するルーティング推奨事項（LOCAL または FALLBACK）とその理由（日本語）。
   agent: critic
 
 execution_routing:
   description: >-
-    Execute the assigned subtasks based on the HERA routing logic.
-    If LOCAL was recommended, the Thinker handles it.
-    If FALLBACK was recommended or it is a "Late" stage task, the Manager takes over.
-    The Manager may further delegate to Antigravity if the task is highly complex.
-    Review the subtasks and routing recommendations from the previous steps and execute accordingly.
+    HERAルーティングロジックに基づいて、割り当てられたサブタスクを実行します。
+    LOCALが推奨された場合はThinkerが処理し、FALLBACKが推奨された場合や「後半」段階のタスクはManagerが引き継ぎます。
+    タスクが非常に複雑な場合、ManagerはさらにAntigravityに委譲することができます。
+    前のステップのサブタスクとルーティング推奨事項を確認し、それに応じて実行してください。
   expected_output: >-
-    The technical result or code for the specific subtask.
+    特定のサブタスクに対する技術的な結果またはコード、およびその日本語による解説。
   agent: thinker
 
 final_verification:
   description: >-
-    Review the entire project output for the request: "{user_request}"
-    Ensure all subtasks are integrated and the HERA strategy was followed.
+    リクエスト: "{user_request}" に対するプロジェクト全体の出力をレビューしてください。
+    すべてのサブタスクが統合され、HERA戦略が遵守されていることを確認します。
   expected_output: >-
-    A final status report and the completed codebase/document.
+    最終的なステータスレポートと、完成したコードベースまたはドキュメント（すべて自然な日本語）。
   agent: manager
