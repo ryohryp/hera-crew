@@ -11,10 +11,10 @@ task_decomposition:
 
 logic_evaluation:
   description: >-
-    Evaluate if the following subtasks can be solved locally by Gemma 3 with 
-    high confidence:
-    {manifest}
-    Assess the complexity and potential for divergence.
+    Evaluate if the subtasks provided in the previous task output can be solved 
+    locally by Gemma 3 with high confidence.
+    Review the manifest from the previous step and assess the complexity 
+    and potential for divergence.
   expected_output: >-
     A routing recommendation (LOCAL or FALLBACK) for each subtask.
   agent: critic
@@ -25,7 +25,7 @@ execution_routing:
     If LOCAL was recommended, the Thinker handles it.
     If FALLBACK was recommended or it is a "Late" stage task, the Manager takes over.
     The Manager may further delegate to Antigravity if the task is highly complex.
-    Current subtask: {current_subtask}
+    Review the subtasks and routing recommendations from the previous steps and execute accordingly.
   expected_output: >-
     The technical result or code for the specific subtask.
   agent: thinker

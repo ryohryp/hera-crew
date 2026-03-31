@@ -34,8 +34,15 @@ pip-delete-this-directory.txt
 # IDE
 .vscode/
 .idea/
+.cursor/
 *.swp
 *.swo
+
+# AI Tools
+.claude/
+.gemini/
+_agents/
+.agents/
 
 # OS
 .DS_Store

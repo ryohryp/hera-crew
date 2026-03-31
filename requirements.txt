@@ -1,7 +1,8 @@
-crewai[tools]
-langchain-community
-mcp
-fastmcp
-python-dotenv
-pyyaml
-pydantic
+crewai==1.12.2
+crewai-tools==1.12.2
+langchain-community==0.4.1
+mcp==1.26.0
+fastmcp==3.1.1
+python-dotenv==1.1.1
+PyYAML==6.0.3
+pydantic==2.11.10

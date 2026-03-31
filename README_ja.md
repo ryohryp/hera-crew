@@ -204,13 +204,22 @@ CRITIC_MODEL=ollama/phi4:latest
 # GOOGLE_API_KEY=your_key
 ```
 
-> **注意:** Ollama モデルには必ず `ollama/` プレフィックスを付けてください。省略すると LiteLLM が OpenAI にルーティングして認証エラーになります。
-> **注意:** Manager には function calling 対応モデルを指定してください（Ollama 上の `deepseek-r1` はツール呼び出し非対応）。
+> **注意:** Ollama モデルには必ず `ollama/` プレフィックスを付けてください。省略すると LiteLLM が OpenAI にルーティングして認証エラーまたは接続エラーになります。
+> **注意:** Manager には function calling 対応モデルを指定してください（Ollama 上の `deepseek-r1` はツール呼び出し非対応です。`qwen2.5` などを推奨します）。
 
 ### トラブルシューティング
 
+**`Failed to connect to OpenAI API` (Connection error) が出る**
+LiteLLM がモデル情報の確認などのために OpenAI に接続しようとして失敗しています。`.env` に以下の 3 つが設定されているか確認してください：
+- `OPENAI_API_KEY=NA`
+- `LITELLM_LOCAL_MODEL_COST_MAP=True`
+- `LITELLM_DROP_PARAMS=True`
+
 **`invalid_api_key` エラーが出る**
-`.env` に `OPENAI_API_KEY=NA` が設定されているか確認してください。本プロジェクトはデフォルトで設定済みです。
+`.env` に `OPENAI_API_KEY=NA` が設定されているか確認してください。本プロジェクトのテンプレートでは設定済みです。
+
+**`404 Model Not Found` エラーが出る**
+`.env` や `llms.yaml` で指定したモデル名が、`ollama list` で表示される名前と一致しているか確認してください。また、`ollama/` プレフィックスが付いていることも必須です。
 
 **長い会話でモデルが「忘れる」**
 `llms.yaml` の `num_ctx` を確認してください。デフォルトで `32768` に設定されています。

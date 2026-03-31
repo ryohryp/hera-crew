@@ -204,8 +204,27 @@ CRITIC_MODEL=ollama/phi4:latest
 # GOOGLE_API_KEY=your_key
 ```
 
-> **Note:** Always use the `ollama/` prefix for Ollama models. Without it, LiteLLM routes the request to OpenAI and fails.
-> **Note:** The Manager must use a function-calling-capable model (`deepseek-r1` does not support tool calling via Ollama).
+> **Note:** Always use the `ollama/` prefix for Ollama models. Without it, LiteLLM routes the request to OpenAI and fails with an auth or connection error.
+> **Note:** The Manager must use a function-calling-capable model (like `qwen2.5:14b`). Note that `deepseek-r1` does not support tool calling via Ollama.
+
+---
+
+## Troubleshooting
+
+**`Failed to connect to OpenAI API` (Connection error)**
+LiteLLM is trying to reach OpenAI for model cost data or validation. Ensure your `.env` has these three flags:
+- `OPENAI_API_KEY=NA`
+- `LITELLM_LOCAL_MODEL_COST_MAP=True`
+- `LITELLM_DROP_PARAMS=True`
+
+**`invalid_api_key` error**
+Ensure `OPENAI_API_KEY=NA` is set in your `.env`.
+
+**`404 Model Not Found` error**
+Check your model names in `llms.yaml` or `.env`. They must exactly match the output of `ollama list` and must include the `ollama/` prefix.
+
+**Model "forgets" in long conversations**
+Verify the `num_ctx` in `llms.yaml`. It is set to `32768` by default for all local models.
 
 ---
 
