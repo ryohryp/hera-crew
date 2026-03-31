@@ -213,6 +213,8 @@ python tests/test_delegation.py
 
 このように、HERA は単に回答を生成するだけでなく、**「自分の能力でどこまでできるか」を批判的に評価し、最適なリソース配分を行います。**
 
+[ログ全文はこちら](logs/sample_execution.log)
+
 ---
 
 ## 設定のカスタマイズ

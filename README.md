@@ -213,6 +213,8 @@ HERA demonstrates sophisticated reasoning in Japanese, even when running entirel
 
 HERA doesn't just generate answers; it **critically assesses its own capabilities** and routes tasks to the most appropriate resource (Local Edge vs. Cloud Expert).
 
+[See full log here](logs/sample_execution.log)
+
 ---
 
 ## Configuration

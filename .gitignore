@@ -47,3 +47,7 @@ _agents/
 # OS
 .DS_Store
 Thumbs.db
+
+# Logs
+logs/*.log
+!logs/sample_execution.log
