@@ -176,6 +176,45 @@ python tests/test_delegation.py
 
 ---
 
+## Example Execution
+
+HERA demonstrates sophisticated reasoning in Japanese, even when running entirely on local 14B models.
+
+**Request:**
+> Implement a satellite orbit simulator based on astrophysics, considering general relativity. Use the Runge-Kutta method for numerical integration and consider acceleration with PyTorch.
+
+**Execution Trace (Summary):**
+
+```text
+╭──────────────────────────────────────────────────── 🤖 Agent Started ────────────────────────────────────────────────────╮
+│  Agent: Bridge Thinker (Gemma 3)                                                                                         │
+│  Task: Decompose the request into detailed subtasks (Manifests) in Japanese.                                             │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+╭───────────────────────────────────────────────── ✅ Agent Final Answer ──────────────────────────────────────────────────╮
+│  Final Answer: (Decomposition example in Japanese)                                                                       │
+│  1. Define basic physical models (constants.py): G, c, earth_mass, etc.                                                  │
+│  2. Relativistic formula implementation (gravity_potential.py): Schwarzschild potential.                                  │
+│  3. RK4 Implementation (rk4.py): 4th-order Runge-Kutta motion integrator.                                                │
+│  ... (omitted)                                                                                                           │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+╭──────────────────────────────────────────────────── 🤖 Agent Started ────────────────────────────────────────────────────╮
+│  Agent: The Quality Critic (Phi-4)                                                                                       │
+│  Task: Evaluate if subtasks are solvable locally or require Cloud escalation (Antigravity).                              │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+╭───────────────────────────────────────────────── ✅ Agent Final Answer ──────────────────────────────────────────────────╮
+│  Final Answer:                                                                                                           │
+│  - Subtasks 1, 4, 6: LOCAL (Safe for Gemma 3 to handle)                                                                  │
+│  - Subtasks 2, 3, 5: FALLBACK (Recommended delegation due to complex physics/RK4 requirements)                            │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+```
+
+HERA doesn't just generate answers; it **critically assesses its own capabilities** and routes tasks to the most appropriate resource (Local Edge vs. Cloud Expert).
+
+---
+
 ## Configuration
 
 ### Swap models via `llms.yaml`
