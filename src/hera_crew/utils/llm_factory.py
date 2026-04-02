@@ -1,7 +1,6 @@
 import os
 import yaml
 from pathlib import Path
-from crewai import LLM
 
 class LLMFactory:
     """
@@ -24,9 +23,9 @@ class LLMFactory:
         return cls._config
 
     @classmethod
-    def create_llm(cls, group: str, name: str, env_override: str = None) -> LLM:
+    def create_llm_config(cls, group: str, name: str, env_override: str = None) -> dict:
         """
-        Creates a CrewAI LLM instance based on the configuration.
+        Returns model configuration for agentcache/LiteLLM.
         
         Args:
             group: The configuration group (e.g., 'hera' or 'general').
@@ -49,22 +48,20 @@ class LLMFactory:
         num_ctx = model_cfg.get('num_ctx', 32768)
         base_url = os.getenv("OLLAMA_BASE_URL", config.get("default_ollama_base_url"))
 
-        # Ollama specific handling
-        if "ollama" in model.lower():
-            return LLM(
-                model=model, 
-                base_url=base_url, 
-                timeout=timeout,
-                api_key="NA",
-                extra_body={"num_ctx": num_ctx}
-            )
-        
-        # General handling
-        return LLM(model=model, timeout=timeout)
+        # Format for LiteLLM if it's Ollama
+        if "ollama/" not in model.lower() and "ollama" in model.lower():
+            model = f"ollama/{model}"
+
+        return {
+            "model": model,
+            "base_url": base_url,
+            "timeout": timeout,
+            "num_ctx": num_ctx
+        }
 
     @classmethod
     def get_group_llms(cls, group: str) -> dict:
-        """Helper to create all LLMs in a specific group."""
+        """Helper to create all LLM configs in a specific group."""
         config = cls._load_config()
         group_config = config.get(group, {})
-        return {name: cls.create_llm(group, name) for name in group_config.keys()}
+        return {name: cls.create_llm_config(group, name) for name in group_config.keys()}
