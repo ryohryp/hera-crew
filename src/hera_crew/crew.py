@@ -226,8 +226,8 @@ class HeraCrew:
             final_result = fork.final_text or execution_result
             ui.complete_step(4, final_result)
 
-        console = Console()
-        console.print(self.tracker.render_savings_panel())
         report_path = self.tracker.save_html()
-        console.print(f"[dim]Report saved → [cyan]{report_path}[/][/]")
+        err = Console(stderr=True)
+        err.print(self.tracker.render_savings_panel())
+        err.print(f"[dim]Report saved → [cyan]{report_path}[/][/]")
         return final_result
