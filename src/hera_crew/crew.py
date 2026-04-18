@@ -5,6 +5,7 @@ import time
 from pathlib import Path
 from agentcache import AgentSession, ForkPolicy, LiteLLMSDKProvider
 from hera_crew.utils.llm_factory import LLMFactory
+from hera_crew.utils.usage_tracker import UsageTracker
 from .tools.antigravity_delegate import antigravity_delegate_tool, ANTIGRAVITY_DELEGATE_SPEC
 
 from rich.console import Console, Group
@@ -111,6 +112,7 @@ class HeraCrew:
         self.provider = LiteLLMSDKProvider()
         self.model_cfg = LLMFactory.create_llm_config('hera', 'manager', "MANAGER_MODEL")
         self.shared_system_prompt = self._create_unified_prompt()
+        self.tracker = UsageTracker()
 
     def _load_yaml(self, filename: str) -> dict:
         path = self.config_path / filename
@@ -129,10 +131,12 @@ class HeraCrew:
 
     async def _tool_executor(self, tool_call_id: str, name: str, arguments: dict) -> str:
         if name == "antigravity_delegate_tool":
+            self.tracker.record_delegation()
             return antigravity_delegate_tool(**arguments)
         return f"Tool '{name}' not found."
 
     async def run(self, user_request: str):
+        self.tracker.register_litellm(self.model_cfg['model'])
         with HeraUI(self.model_cfg['model']) as ui:
             session = AgentSession(
                 model=self.model_cfg['model'],
@@ -143,6 +147,7 @@ class HeraCrew:
 
             # Step 1: Task Decomposition
             ui.start_step(1)
+            self.tracker.set_step("Task Decomposition")
             task_info = self.tasks_config['task_decomposition']
             prompt = (
                 f"Act as Thinker.\n"
@@ -157,6 +162,7 @@ class HeraCrew:
 
             # Step 2: Logic Evaluation
             ui.start_step(2)
+            self.tracker.set_step("Logic Evaluation")
             task_info = self.tasks_config['logic_evaluation']
             prompt = (
                 f"Act as Critic.\n"
@@ -172,6 +178,7 @@ class HeraCrew:
 
             # Step 3: Execution & Routing
             ui.start_step(3)
+            self.tracker.set_step("Execution & Routing")
             task_info = self.tasks_config['execution_routing']
             prompt = (
                 f"Act as Manager/Thinker.\n"
@@ -204,6 +211,7 @@ class HeraCrew:
 
             # Step 4: Final Verification
             ui.start_step(4)
+            self.tracker.set_step("Final Verification")
             task_info = self.tasks_config['final_verification']
             prompt = (
                 f"Act as Orchestrator Manager.\n"
@@ -218,4 +226,8 @@ class HeraCrew:
             final_result = fork.final_text or execution_result
             ui.complete_step(4, final_result)
 
-            return final_result
+        console = Console()
+        console.print(self.tracker.render_savings_panel())
+        report_path = self.tracker.save_html()
+        console.print(f"[dim]Report saved → [cyan]{report_path}[/][/]")
+        return final_result
