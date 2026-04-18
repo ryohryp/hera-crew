@@ -3,6 +3,10 @@ import os
 import sys
 from pathlib import Path
 
+# Fix Windows encoding for emojis
+if sys.platform == "win32" and hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
+
 # Add src to sys.path
 src_path = Path(__file__).parent / "src"
 sys.path.append(str(src_path))
