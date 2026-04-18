@@ -20,18 +20,14 @@ os.environ["OPENAI_API_KEY"] = "NA"
 os.environ["OPENAI_API_BASE"] = "http://localhost:11434/v1"
 os.environ["OLLAMA_HOST"] = "http://localhost:11434"
 
+import asyncio
+
 def test_run():
     user_request = "宇宙物理学に基づき、一般相対性理論を考慮した人工衛星の軌道シミュレータを実装せよ。数値積分にはRunge-Kutta法を使用し、PyTorchでの高速化も検討すること。"
     
-    inputs = {
-        'user_request': user_request,
-        'manifest': 'Deep technical analysis required',
-        'current_subtask': 'Starting complex orbital mechanics task'
-    }
-    
     print(f"Testing with request: {user_request}")
     try:
-        result = HeraCrew().crew().kickoff(inputs=inputs)
+        result = asyncio.run(HeraCrew().run(user_request))
         print("\n\n########################")
         print("## TEST RESULT ##")
         print("########################\n")

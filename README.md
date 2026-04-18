@@ -8,7 +8,7 @@
 > [日本語版はこちら](README_ja.md)
 
 A local-first, multi-agent AI system built on [CrewAI](https://github.com/crewAIInc/crewAI) and [Ollama](https://ollama.com/).
-Run powerful 14B-class models entirely on your own GPU — no cloud API required.
+Run powerful 14B-class models entirely on your own GPU  Eno cloud API required.
 When you need it, plug in Gemini or any other cloud LLM with a single `.env` change.
 
 ---
@@ -17,9 +17,9 @@ When you need it, plug in Gemini or any other cloud LLM with a single `.env` cha
 
 Most AI workflows default to cloud APIs for every call. HERA flips that default:
 
-- **Thinker** (Gemma 3) — decomposes tasks and writes first drafts locally
-- **Critic** (Phi-4) — reviews and catches hallucinations locally
-- **Manager** (Qwen2.5 14B) — orchestrates, validates, and escalates to cloud only when needed
+- **Thinker** (Gemma 4)  Edecomposes tasks and writes first drafts locally
+- **Critic** (Phi-4)  Ereviews and catches hallucinations locally
+- **Manager** (Qwen2.5 14B)  Eorchestrates, validates, and escalates to cloud only when needed
 
 The result: the expensive cloud token budget is spent only on work that actually needs it.
 
@@ -34,11 +34,11 @@ The result: the expensive cloud token budget is spent only on work that actually
 
 ## Key Features
 
-- **HERA resource strategy** — dynamic local/cloud routing per task
-- **MCP server mode** — expose the crew as a tool to Claude Desktop, Cursor, etc.
-- **Centralized LLM config** — one `llms.yaml` controls every model; `.env` overrides per-run
-- **32k context window** — `num_ctx: 32768` applied to all Ollama calls via `extra_body`
-- **Zero OpenAI dependency** — fully offline by default; no `OPENAI_API_KEY` required
+- **HERA resource strategy**  Edynamic local/cloud routing per task
+- **MCP server mode**  Eexpose the crew as a tool to Claude Desktop, Cursor, etc.
+- **Centralized LLM config**  Eone `llms.yaml` controls every model; `.env` overrides per-run
+- **32k context window**  E`num_ctx: 32768` applied to all Ollama calls via `extra_body`
+- **Zero OpenAI dependency**  Efully offline by default; no `OPENAI_API_KEY` required
 
 ---
 
@@ -55,7 +55,7 @@ graph TD
         C[CrewAI Orchestrator]
 
         subgraph "Ollama 14B models"
-            D[Thinker: Gemma 3]
+            D[Thinker: Gemma 4]
             E[Critic: Phi-4]
             F[Manager: Qwen2.5 14B]
         end
@@ -81,17 +81,17 @@ hera-crew/
 ├── mcp_crew_server.py          # MCP server entry point
 ├── requirements.txt
 ├── scripts/
-│   └── inspect_llm.py
+━E  └── inspect_llm.py
 ├── tests/
-│   ├── test_delegation.py
-│   └── test_llm_syntax.py
+━E  ├── test_delegation.py
+━E  └── test_llm_syntax.py
 └── src/hera_crew/
     ├── config/
-    │   ├── agents.yaml         # Agent role definitions
-    │   ├── llms.yaml           # Centralized model config
-    │   └── tasks.yaml          # Task routing definitions
+    ━E  ├── agents.yaml         # Agent role definitions
+    ━E  ├── llms.yaml           # Centralized model config
+    ━E  └── tasks.yaml          # Task routing definitions
     ├── tools/
-    │   └── antigravity_delegate.py
+    ━E  └── antigravity_delegate.py
     ├── crew.py
     └── main.py
 ```
@@ -100,7 +100,7 @@ hera-crew/
 
 ## Requirements
 
-- Python 3.10 – 3.13
+- Python 3.10  E3.13
 - [Ollama](https://ollama.com/) installed and running
 - GPU recommended (VRAM 16 GB+ for all 14B models simultaneously)
 
@@ -125,8 +125,8 @@ Pull the required Ollama models:
 
 ```bash
 # HERA crew (main.py)
-ollama pull qwen2.5:14b         # Manager — must support function calling
-ollama pull gemma3:latest       # Thinker
+ollama pull qwen2.5:14b         # Manager  Emust support function calling
+ollama pull gemma4:26b       # Thinker
 ollama pull phi4:latest         # Critic
 
 # MCP server (mcp_crew_server.py)
@@ -145,7 +145,7 @@ python src/hera_crew/main.py
 ```
 
 Enter your task at the prompt. The crew runs sequentially:
-Thinker → Critic → Manager → final output.
+Thinker ↁECritic ↁEManager ↁEfinal output.
 
 ### MCP Server
 
@@ -186,29 +186,17 @@ HERA demonstrates sophisticated reasoning in Japanese, even when running entirel
 **Execution Trace (Summary):**
 
 ```text
-╭──────────────────────────────────────────────────── 🤖 Agent Started ────────────────────────────────────────────────────╮
-│  Agent: Bridge Thinker (Gemma 3)                                                                                         │
-│  Task: Decompose the request into detailed subtasks (Manifests) in Japanese.                                             │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+╭──────────────────────────────────────────────────── 🤁EAgent Started ────────────────────────────────────────────────────╮
+━E Agent: Bridge Thinker (Gemma 4)                                                                                         ━E━E Task: Decompose the request into detailed subtasks (Manifests) in Japanese.                                             ━E╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
 
-╭───────────────────────────────────────────────── ✅ Agent Final Answer ──────────────────────────────────────────────────╮
-│  Final Answer: (Decomposition example in Japanese)                                                                       │
-│  1. Define basic physical models (constants.py): G, c, earth_mass, etc.                                                  │
-│  2. Relativistic formula implementation (gravity_potential.py): Schwarzschild potential.                                  │
-│  3. RK4 Implementation (rk4.py): 4th-order Runge-Kutta motion integrator.                                                │
-│  ... (omitted)                                                                                                           │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+╭───────────────────────────────────────────────── ✁EAgent Final Answer ──────────────────────────────────────────────────╮
+━E Final Answer: (Decomposition example in Japanese)                                                                       ━E━E 1. Define basic physical models (constants.py): G, c, earth_mass, etc.                                                  ━E━E 2. Relativistic formula implementation (gravity_potential.py): Schwarzschild potential.                                  ━E━E 3. RK4 Implementation (rk4.py): 4th-order Runge-Kutta motion integrator.                                                ━E━E ... (omitted)                                                                                                           ━E╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
 
-╭──────────────────────────────────────────────────── 🤖 Agent Started ────────────────────────────────────────────────────╮
-│  Agent: The Quality Critic (Phi-4)                                                                                       │
-│  Task: Evaluate if subtasks are solvable locally or require Cloud escalation (Antigravity).                              │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+╭──────────────────────────────────────────────────── 🤁EAgent Started ────────────────────────────────────────────────────╮
+━E Agent: The Quality Critic (Phi-4)                                                                                       ━E━E Task: Evaluate if subtasks are solvable locally or require Cloud escalation (Antigravity).                              ━E╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
 
-╭───────────────────────────────────────────────── ✅ Agent Final Answer ──────────────────────────────────────────────────╮
-│  Final Answer:                                                                                                           │
-│  - Subtasks 1, 4, 6: LOCAL (Safe for Gemma 3 to handle)                                                                  │
-│  - Subtasks 2, 3, 5: FALLBACK (Recommended delegation due to complex physics/RK4 requirements)                            │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+╭───────────────────────────────────────────────── ✁EAgent Final Answer ──────────────────────────────────────────────────╮
+━E Final Answer:                                                                                                           ━E━E - Subtasks 1, 4, 6: LOCAL (Safe for Gemma 4 to handle)                                                                  ━E━E - Subtasks 2, 3, 5: FALLBACK (Recommended delegation due to complex physics/RK4 requirements)                            ━E╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
 ```
 
 HERA doesn't just generate answers; it **critically assesses its own capabilities** and routes tasks to the most appropriate resource (Local Edge vs. Cloud Expert).
@@ -228,7 +216,7 @@ hera:
     timeout: 300
     num_ctx: 32768
   thinker:
-    model: "ollama/gemma3:latest"
+    model: "ollama/gemma4:26b"
   critic:
     model: "ollama/phi4:latest"
 ```
@@ -237,7 +225,7 @@ hera:
 
 ```ini
 MANAGER_MODEL=ollama/qwen2.5:14b
-THINKER_MODEL=ollama/gemma3:latest
+THINKER_MODEL=ollama/gemma4:26b
 CRITIC_MODEL=ollama/phi4:latest
 
 # Switch to cloud:

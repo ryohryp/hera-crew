@@ -9,7 +9,7 @@ hera:
     timeout: 300
     num_ctx: 32768
   thinker:
-    model: "ollama/gemma3:latest"
+    model: "ollama/gemma4:26b"
     timeout: 60
     num_ctx: 32768
   critic:
