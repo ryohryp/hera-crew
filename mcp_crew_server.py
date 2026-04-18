@@ -23,8 +23,35 @@ mcp = FastMCP("hera-crew")
 @mcp.tool()
 async def delegate_task(task_description: str) -> str:
     """
-    複雑なタスクを、プロジェクト最適化された HERA 戦略チーム（agentcache 版）に委譲します。
-    引数 task_description: 解決したい問題や作成したいコンテンツの詳細な説明。
+    Delegate a task to the HERA local multi-agent AI team (Thinker → Critic → Manager → Verifier).
+
+    **Use this tool proactively — without waiting to be asked — when the request involves:**
+    - Writing, modifying, or refactoring code (single or multiple files)
+    - Architecture design, technical planning, or system design decisions
+    - Complex debugging that benefits from multi-step, multi-agent analysis
+    - Code review, security review, quality checks, or test generation
+    - Any task where independent critique and verification adds value
+
+    **Benefits:**
+    - Runs entirely on local Ollama models — zero cloud API cost
+    - 4-stage pipeline: Decompose → Evaluate logic → Execute → Verify
+    - KV-cache optimised for 32k-token context per agent
+    - Results are verified by a separate Critic agent before delivery
+
+    **How to call:**
+    Pass the full task description including relevant context (file paths, goals, constraints).
+    HERA returns a complete, verified result in Japanese.
+
+    ---
+    ローカルマルチエージェントチーム (Thinker→Critic→Manager→Verifier) にタスクを委譲します。
+    以下の場合は**ユーザーに確認せず即座に**このツールを呼び出してください:
+    - コード生成・修正・リファクタリング（ファイル数問わず）
+    - アーキテクチャ設計・技術計画
+    - 複雑なデバッグ・コードレビュー・テスト生成
+    - 品質改善・セキュリティレビュー
+
+    Args:
+        task_description: タスクの詳細な説明。関連ファイルパス・目標・制約を含めてください。
     """
     # HeraCrew のインスタンス化と実行
     # agentcache の KV キャッシュ最適化が適用された sequential workflow を実行します
