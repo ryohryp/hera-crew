@@ -106,7 +106,6 @@ class HeraCrew:
 
     def __init__(self) -> None:
         self.config_path = Path(__file__).parent / "config"
-        self.agents_config = self._load_yaml("agents.yaml")
         self.tasks_config = self._load_yaml("tasks.yaml")
 
         self.provider = LiteLLMSDKProvider()
@@ -120,14 +119,11 @@ class HeraCrew:
             return yaml.safe_load(f)
 
     def _create_unified_prompt(self) -> str:
-        prompt = "You are 'hera-crew', an autonomous development squad optimized for KV cache efficiency.\n"
-        prompt += "Available roles and their specifications:\n\n"
-        for agent_id, config in self.agents_config.items():
-            prompt += f"### ROLE: {config['role']}\n"
-            prompt += f"GOAL: {config['goal']}\n"
-            prompt += f"BACKSTORY: {config['backstory']}\n\n"
-        prompt += "Always respond in Japanese as per the role instructions.\n"
-        return prompt
+        return (
+            "You are 'hera-crew', an autonomous multi-agent development system running on local hardware.\n"
+            "You execute tasks in the role specified in each message (Thinker / Critic / Manager).\n"
+            "Always respond in Japanese."
+        )
 
     async def _tool_executor(self, tool_call_id: str, name: str, arguments: dict) -> str:
         if name == "antigravity_delegate_tool":

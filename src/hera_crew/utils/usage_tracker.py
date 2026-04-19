@@ -358,7 +358,7 @@ class UsageTracker:
         self._append_history(ts, elapsed, output_dir)
         history = self._load_history(output_dir)
 
-        path = output_dir / f"hera_run_{ts}.html"
+        path = output_dir / "hera_report.html"
         path.write_text(self._render_html(ts, elapsed, history), encoding="utf-8")
         return path
 
