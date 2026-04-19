@@ -18,13 +18,12 @@ You have access to the `mcp__hera-crew__delegate_task` tool.
 ```
 mcp__hera-crew__delegate_task(
     task_description="<full task with file paths, goals, constraints>",
-    orchestrator_input_tokens=<your input tokens so far>,
-    orchestrator_output_tokens=<your output tokens so far>,
-    orchestrator_model="claude-opus-4-6"
 )
 ```
 
-Always pass your token counts so HERA can show the full cost comparison in its report.
+> **Note:** Claude Code cannot expose its own token counts to MCP tools.
+> Leave `orchestrator_input_tokens` / `orchestrator_output_tokens` unset (default 0).
+> The report will show time-based pipeline metrics instead of cost comparison.
 
 ### Why
 

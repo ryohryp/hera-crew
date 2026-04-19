@@ -900,18 +900,36 @@ class UsageTracker:
   {zero_savings_note}
 </div>"""
         else:
+            # Claude Code cannot expose its own token counts to MCP tools — show time-based metrics instead
+            total_step_time = sum(self._step_elapsed.values())
+            step_time_rows = "".join(
+                f'<tr><td style="color:{_PIPELINE_AGENTS.get(s,("",color))[1] if (color:=_PIPELINE_AGENTS.get(s,("","#94a3b8"))[1]) else "#94a3b8"};padding:.3rem .6rem;">'
+                f'{_PIPELINE_AGENTS.get(s,(s,""))[0]}</td>'
+                f'<td style="color:#94a3b8;padding:.3rem .6rem;">{s}</td>'
+                f'<td style="text-align:right;padding:.3rem .6rem;color:#e2e8f0;">{t:.1f}s</td></tr>'
+                for s, t in self._step_elapsed.items()
+            )
             cost_section = f"""
 <hr class="divider">
 <p class="section-title">コスト内訳</p>
-<div class="ts-card" style="max-width:480px;margin-bottom:1rem;">
-  <div style="color:#64748b;font-size:.82rem;">
-    ⚠️ クラウドLLMのトークン使用量が未報告です。<br>
-    <code style="font-size:.75rem;color:#94a3b8;">delegate_task</code> 呼び出し時に
-    <code style="font-size:.75rem;color:#94a3b8;">orchestrator_input_tokens</code> /
-    <code style="font-size:.75rem;color:#94a3b8;">orchestrator_output_tokens</code> を渡すとコスト比較が表示されます。
+<div class="grid" style="grid-template-columns:1fr 1fr;margin-bottom:1rem;">
+  <div class="card" style="border-color:#34d399;">
+    <div class="card-label">ローカル実行コスト</div>
+    <div class="card-value" style="color:#34d399;">$0.0000</div>
+    <div class="ref">Ollama — クラウド費用なし</div>
+    <span class="badge badge-ok">100% ローカル処理</span>
   </div>
-  <div style="margin-top:.8rem;">
-    <span class="badge badge-ok">HERA節約額: ${hera_savings:.4f}（vs {savings_ref_label}）</span>
+  <div class="card" style="border-color:#6366f1;">
+    <div class="card-label">合計パイプライン時間</div>
+    <div class="card-value" style="color:#6366f1;font-size:1.6rem;">{total_step_time:.1f}s</div>
+    <div class="ref">{n_steps_ran if (n_steps_ran := sum(1 for s in PIPELINE_STEPS if s in self._step_elapsed)) else len(self._step_elapsed)} ステージ完了</div>
+  </div>
+</div>
+{"<table style='border-collapse:collapse;font-size:.8rem;width:100%;max-width:400px;'>" + step_time_rows + "</table>" if step_time_rows else ""}
+<div class="ts-card" style="max-width:480px;margin-top:1rem;">
+  <div style="color:#475569;font-size:.78rem;line-height:1.6;">
+    ℹ️ Claude Code はMCPツールに自身のトークン数を公開しない仕様です。<br>
+    Gemini など他のオーケストレーターから呼び出すと、ここにクラウドとのコスト比較が表示されます。
   </div>
 </div>"""
 

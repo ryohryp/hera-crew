@@ -103,7 +103,8 @@ hera-crew/
     │   ├── llm_factory.py      # LLM 設定ビルダー
     │   └── usage_tracker.py    # トークン使用量 & コスト追跡
     ├── crew.py                 # HeraCrew — 4 段階パイプライン + HeraUI
-    └── main.py                 # スタンドアロン CLI エントリーポイント
+    ├── main.py                 # スタンドアロン CLI エントリーポイント
+    └── orbital_simulator.py    # 例: GR 補正軌道シミュレータ (RK4 + PyTorch)
 ```
 
 ---
@@ -182,6 +183,10 @@ delegate_task(
 ```
 
 トークン数を渡すことで、HERA が HTML レポートにローカル vs. クラウドのコスト比較を表示します。
+
+> **Claude Code ユーザーへの注意:** Claude Code は自身のトークン数を MCP ツールに渡せません。
+> `orchestrator_input_tokens` / `orchestrator_output_tokens` は省略してください（デフォルト 0）。
+> レポートにはコスト比較の代わりに時間ベースのパイプライン指標が表示されます。
 
 ### クイックテスト
 

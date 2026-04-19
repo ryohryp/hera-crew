@@ -105,7 +105,8 @@ hera-crew/
     │   ├── llm_factory.py      # LLM config builder
     │   └── usage_tracker.py    # Token usage & cost tracking
     ├── crew.py                 # HeraCrew — 4-stage pipeline + HeraUI
-    └── main.py                 # Standalone CLI entry point
+    ├── main.py                 # Standalone CLI entry point
+    └── orbital_simulator.py    # Example: GR-corrected orbit simulator (RK4 + PyTorch)
 ```
 
 ---
@@ -184,6 +185,10 @@ delegate_task(
 ```
 
 Passing token counts lets HERA render a full local-vs-cloud cost comparison in the HTML report.
+
+> **Note for Claude Code users:** Claude Code cannot expose its own token counts to MCP tools.
+> Leave `orchestrator_input_tokens` / `orchestrator_output_tokens` unset (default 0).
+> The report will show time-based pipeline metrics instead of cost comparison.
 
 ### Quick test
 
