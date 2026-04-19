@@ -42,3 +42,7 @@ def setup_environment():
     # Optimization for Ollama parallel execution
     if "OLLAMA_NUM_PARALLEL" not in os.environ:
         os.environ["OLLAMA_NUM_PARALLEL"] = "4"
+
+    # Set LiteLLM global request timeout for local large models (26B+ on Ollama)
+    import litellm
+    litellm.request_timeout = int(os.getenv("LITELLM_REQUEST_TIMEOUT", "600"))

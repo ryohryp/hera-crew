@@ -137,97 +137,106 @@ class HeraCrew:
 
     async def run(self, user_request: str):
         self.tracker.register_litellm(self.model_cfg['model'])
-        with HeraUI(self.model_cfg['model']) as ui:
-            session = AgentSession(
-                model=self.model_cfg['model'],
-                provider=self.provider,
-                system_prompt=self.shared_system_prompt,
-            )
-            await session.respond("System initialization. Awaiting tasks.")
+        self.tracker.set_task(user_request)
+        final_result = ""
+        try:
+            with HeraUI(self.model_cfg['model']) as ui:
+                session = AgentSession(
+                    model=self.model_cfg['model'],
+                    provider=self.provider,
+                    system_prompt=self.shared_system_prompt,
+                )
+                await session.respond("System initialization. Awaiting tasks.")
 
-            # Step 1: Task Decomposition
-            ui.start_step(1)
-            self.tracker.set_step("Task Decomposition")
-            task_info = self.tasks_config['task_decomposition']
-            prompt = (
-                f"Act as Thinker.\n"
-                f"Description: {task_info['description'].format(user_request=user_request)}\n"
-                f"Expected Output: {task_info['expected_output']}\n\n"
-                "CRITICAL INSTRUCTION: You MUST output your response as plain text. "
-                "Do NOT use any tools or function calls for this step."
-            )
-            fork = await session.fork(prompt=prompt, policy=ForkPolicy.cache_safe_ephemeral())
-            decomposition_result = fork.final_text
-            ui.complete_step(1, decomposition_result)
+                # Step 1: Task Decomposition
+                ui.start_step(1)
+                self.tracker.set_step("Task Decomposition")
+                task_info = self.tasks_config['task_decomposition']
+                prompt = (
+                    f"Act as Thinker.\n"
+                    f"Description: {task_info['description'].format(user_request=user_request)}\n"
+                    f"Expected Output: {task_info['expected_output']}\n\n"
+                    "CRITICAL INSTRUCTION: You MUST output your response as plain text. "
+                    "Do NOT use any tools or function calls for this step."
+                )
+                fork = await session.fork(prompt=prompt, policy=ForkPolicy.cache_safe_ephemeral())
+                decomposition_result = fork.final_text
+                ui.complete_step(1, decomposition_result)
 
-            # Step 2: Logic Evaluation
-            ui.start_step(2)
-            self.tracker.set_step("Logic Evaluation")
-            task_info = self.tasks_config['logic_evaluation']
-            prompt = (
-                f"Act as Critic.\n"
-                f"Previous Step Result: {decomposition_result}\n"
-                f"Description: {task_info['description']}\n"
-                f"Expected Output: {task_info['expected_output']}\n\n"
-                "CRITICAL INSTRUCTION: You MUST output your response as plain text. "
-                "Do NOT use any tools or function calls for this step."
-            )
-            fork = await session.fork(prompt=prompt, policy=ForkPolicy.cache_safe_ephemeral())
-            evaluation_result = fork.final_text
-            ui.complete_step(2, evaluation_result)
+                # Step 2: Logic Evaluation
+                ui.start_step(2)
+                self.tracker.set_step("Logic Evaluation")
+                task_info = self.tasks_config['logic_evaluation']
+                prompt = (
+                    f"Act as Critic.\n"
+                    f"Previous Step Result: {decomposition_result}\n"
+                    f"Description: {task_info['description']}\n"
+                    f"Expected Output: {task_info['expected_output']}\n\n"
+                    "CRITICAL INSTRUCTION: You MUST output your response as plain text. "
+                    "Do NOT use any tools or function calls for this step."
+                )
+                fork = await session.fork(prompt=prompt, policy=ForkPolicy.cache_safe_ephemeral())
+                evaluation_result = fork.final_text
+                ui.complete_step(2, evaluation_result)
 
-            # Step 3: Execution & Routing
-            ui.start_step(3)
-            self.tracker.set_step("Execution & Routing")
-            task_info = self.tasks_config['execution_routing']
-            prompt = (
-                f"Act as Manager/Thinker.\n"
-                f"Context: {decomposition_result}\n"
-                f"Evaluation: {evaluation_result}\n"
-                f"Description: {task_info['description']}\n"
-                f"Expected Output: {task_info['expected_output']}"
-            )
-            session.tools = [ANTIGRAVITY_DELEGATE_SPEC]
-            execution_policy = ForkPolicy.cache_safe_ephemeral()
-            execution_policy.max_turns = 3
-            fork = await session.fork(
-                prompt=prompt,
-                tool_executor=self._tool_executor,
-                policy=execution_policy,
-            )
-            execution_result = fork.final_text
-            session.tools = []
-            if not execution_result:
+                # Step 3: Execution & Routing
+                ui.start_step(3)
+                self.tracker.set_step("Execution & Routing")
+                task_info = self.tasks_config['execution_routing']
+                prompt = (
+                    f"Act as Manager/Thinker.\n"
+                    f"Context: {decomposition_result}\n"
+                    f"Evaluation: {evaluation_result}\n"
+                    f"Description: {task_info['description']}\n"
+                    f"Expected Output: {task_info['expected_output']}"
+                )
+                session.tools = [ANTIGRAVITY_DELEGATE_SPEC]
+                execution_policy = ForkPolicy.cache_safe_ephemeral()
+                execution_policy.max_turns = 3
                 fork = await session.fork(
-                    prompt=(
-                        "CRITICAL INSTRUCTION: The tool has executed successfully. "
-                        "Now, provide a plain text summary of the final result based on "
-                        "the tool output above. Do NOT use any tools."
-                    ),
-                    policy=ForkPolicy.cache_safe_ephemeral(),
+                    prompt=prompt,
+                    tool_executor=self._tool_executor,
+                    policy=execution_policy,
                 )
                 execution_result = fork.final_text
-            ui.complete_step(3, execution_result)
+                session.tools = []
+                if not execution_result:
+                    fork = await session.fork(
+                        prompt=(
+                            "CRITICAL INSTRUCTION: The tool has executed successfully. "
+                            "Now, provide a plain text summary of the final result based on "
+                            "the tool output above. Do NOT use any tools."
+                        ),
+                        policy=ForkPolicy.cache_safe_ephemeral(),
+                    )
+                    execution_result = fork.final_text
+                ui.complete_step(3, execution_result)
 
-            # Step 4: Final Verification
-            ui.start_step(4)
-            self.tracker.set_step("Final Verification")
-            task_info = self.tasks_config['final_verification']
-            prompt = (
-                f"Act as Orchestrator Manager.\n"
-                f"Original Request: {user_request}\n"
-                f"Final Result of Process: {execution_result}\n"
-                f"Description: {task_info['description']}\n"
-                f"Expected Output: {task_info['expected_output']}\n\n"
-                "CRITICAL INSTRUCTION: You MUST output your response as plain text. "
-                "Do NOT use any tools or function calls for this step."
-            )
-            fork = await session.fork(prompt=prompt, policy=ForkPolicy.cache_safe_ephemeral())
-            final_result = fork.final_text or execution_result
-            ui.complete_step(4, final_result)
+                # Step 4: Final Verification
+                ui.start_step(4)
+                self.tracker.set_step("Final Verification")
+                task_info = self.tasks_config['final_verification']
+                prompt = (
+                    f"Act as Orchestrator Manager.\n"
+                    f"Original Request: {user_request}\n"
+                    f"Final Result of Process: {execution_result}\n"
+                    f"Description: {task_info['description']}\n"
+                    f"Expected Output: {task_info['expected_output']}\n\n"
+                    "CRITICAL INSTRUCTION: You MUST output your response as plain text. "
+                    "Do NOT use any tools or function calls for this step."
+                )
+                fork = await session.fork(prompt=prompt, policy=ForkPolicy.cache_safe_ephemeral())
+                final_result = fork.final_text or execution_result
+                ui.complete_step(4, final_result)
 
-        report_path = self.tracker.save_html()
-        err = Console(stderr=True)
-        err.print(self.tracker.render_savings_panel())
-        err.print(f"[dim]Report saved → [cyan]{report_path}[/][/]")
+        finally:
+            self.tracker.finalize()
+            try:
+                report_path = self.tracker.save_html()
+                err = Console(stderr=True)
+                err.print(self.tracker.render_savings_panel())
+                err.print(f"[dim]レポート保存 → [cyan]{report_path}[/][/]")
+            except Exception as e:
+                Console(stderr=True).print(f"[yellow]レポート生成失敗: {e}[/]")
+
         return final_result
