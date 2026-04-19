@@ -35,6 +35,16 @@ class _StepSummary:
 
 # ── task keyword classifier ───────────────────────────────────────────────────
 
+_CLOUD_PRICING: dict[str, tuple[float, float]] = {
+    "claude-sonnet-4-6":         (3.00 / 1_000_000, 15.00 / 1_000_000),
+    "claude-opus-4-7":           (15.00 / 1_000_000, 75.00 / 1_000_000),
+    "claude-haiku-4-5":          (0.80 / 1_000_000, 4.00 / 1_000_000),
+    "gpt-4o":                    (2.50 / 1_000_000, 10.00 / 1_000_000),
+    "gpt-4o-mini":               (0.15 / 1_000_000, 0.60 / 1_000_000),
+    "gemini-2.0-flash":          (0.10 / 1_000_000, 0.40 / 1_000_000),
+}
+_DEFAULT_ORCHESTRATOR_PRICING = (3.00 / 1_000_000, 15.00 / 1_000_000)  # Claude Sonnet 4.6
+
 _TASK_CATEGORIES: list[tuple[str, list[str]]] = [
     ("コード生成",   ["作成", "書いて", "実装", "generate", "create", "write", "implement"]),
     ("リファクタ",   ["リファクタ", "整理", "refactor", "clean", "restructure"]),
@@ -67,6 +77,9 @@ class UsageTracker:
         self._task: str = ""
         self._step_start_times: dict[str, float] = {}
         self._step_elapsed: dict[str, float] = {}
+        self._orch_input_tokens: int = 0
+        self._orch_output_tokens: int = 0
+        self._orch_model: str = ""
 
     def register_litellm(self, model_name: str = "") -> None:
         self._model_name = model_name
@@ -113,6 +126,11 @@ class UsageTracker:
     def record_delegation(self) -> None:
         self._delegations += 1
 
+    def record_orchestrator_usage(self, input_tokens: int, output_tokens: int, model: str = "") -> None:
+        self._orch_input_tokens = input_tokens
+        self._orch_output_tokens = output_tokens
+        self._orch_model = model or "claude-sonnet-4-6"
+
     # ── aggregated stats ──────────────────────────────────────────────────────
 
     @property
@@ -137,6 +155,18 @@ class UsageTracker:
             self.total_prompt_tokens * self._INPUT_PRICE
             + self.total_completion_tokens * self._OUTPUT_PRICE
         )
+
+    @property
+    def orchestrator_cost_usd(self) -> float:
+        if not (self._orch_input_tokens or self._orch_output_tokens):
+            return 0.0
+        key = self._orch_model.lower()
+        in_price, out_price = _CLOUD_PRICING.get(key, _DEFAULT_ORCHESTRATOR_PRICING)
+        return self._orch_input_tokens * in_price + self._orch_output_tokens * out_price
+
+    @property
+    def has_orchestrator_data(self) -> bool:
+        return bool(self._orch_input_tokens or self._orch_output_tokens)
 
     @property
     def output_ratio(self) -> float:
@@ -205,6 +235,10 @@ class UsageTracker:
             "delegations": self._delegations,
             "model": self._model_name,
             "step_elapsed": {k: round(v, 1) for k, v in self._step_elapsed.items()},
+            "orch_input_tokens": self._orch_input_tokens,
+            "orch_output_tokens": self._orch_output_tokens,
+            "orch_model": self._orch_model,
+            "orch_cost_usd": round(self.orchestrator_cost_usd, 6),
         }
         with open(output_dir / "history.jsonl", "a", encoding="utf-8") as f:
             f.write(json.dumps(entry, ensure_ascii=False) + "\n")
@@ -425,6 +459,72 @@ class UsageTracker:
         step_time_items = [(s.name, s.elapsed_s) for s in steps if s.elapsed_s > 0]
         step_time_svg = self._svg_hbar(step_time_items, "#22d3ee")
 
+        # ── オーケストレーターコスト比較 ─────────────────────────────────
+        orch_cost = self.orchestrator_cost_usd
+        hera_savings = self.estimated_cloud_savings_usd
+        full_cloud_cost = orch_cost + hera_savings
+        total_actual = orch_cost  # local is $0
+        cost_reduction_pct = (hera_savings / full_cloud_cost * 100) if full_cloud_cost > 0 else 0
+
+        if self.has_orchestrator_data:
+            orch_model_label = self._orch_model or "Claude Sonnet 4.6"
+            orch_tokens_total = self._orch_input_tokens + self._orch_output_tokens
+
+            bar_max = max(full_cloud_cost, 0.0001)
+            orch_pct = int(orch_cost / bar_max * 100)
+            hera_pct = int(hera_savings / bar_max * 100)
+
+            cost_section = f"""
+<hr class="divider">
+<p class="section-title">コスト内訳  <span style="font-weight:400;color:#334155">（クラウド実費 + ローカル節約）</span></p>
+<div class="grid" style="grid-template-columns:1fr 1fr 1fr;">
+  <div class="card" style="border-color:#f87171;">
+    <div class="card-label">クラウドLLM実費</div>
+    <div class="card-value" style="color:#f87171;">${orch_cost:.4f}</div>
+    <div class="ref">{orch_model_label} · {orch_tokens_total:,} tok</div>
+    <div class="ref">入力: {self._orch_input_tokens:,} / 出力: {self._orch_output_tokens:,}</div>
+  </div>
+  <div class="card savings">
+    <div class="card-label">HERA節約額（ローカル化）</div>
+    <div class="card-value">${hera_savings:.4f}</div>
+    <div class="ref">全クラウド換算 vs $0（Ollama）</div>
+  </div>
+  <div class="card" style="border-color:#6366f1;">
+    <div class="card-label">全クラウド換算（参考）</div>
+    <div class="card-value" style="color:#6366f1;">${full_cloud_cost:.4f}</div>
+    <div class="ref">削減率: <strong style="color:#34d399">{cost_reduction_pct:.0f}%</strong> コスト削減</div>
+  </div>
+</div>
+<div class="ts-card" style="max-width:560px;margin-bottom:1rem;">
+  <div class="ts-label">コスト構成比（全クラウド換算を100%とした場合）</div>
+  <svg viewBox="0 0 560 44" style="width:100%;height:auto;">
+    <rect x="0" y="10" width="560" height="24" fill="#2d2d44" rx="4"/>
+    <rect x="0" y="10" width="{orch_pct * 5.6:.1f}" height="24" fill="#f87171cc" rx="4">
+      <title>クラウドLLM: ${orch_cost:.4f} ({orch_pct}%)</title></rect>
+    <rect x="{orch_pct * 5.6:.1f}" y="10" width="{hera_pct * 5.6:.1f}" height="24" fill="#34d39988" rx="0">
+      <title>HERA節約: ${hera_savings:.4f} ({hera_pct}%)</title></rect>
+    <text x="{orch_pct * 5.6 / 2:.1f}" y="26" text-anchor="middle" font-size="9" fill="#fff" font-weight="bold">クラウド {orch_pct}%</text>
+    <text x="{orch_pct * 5.6 + hera_pct * 5.6 / 2:.1f}" y="26" text-anchor="middle" font-size="9" fill="#fff" font-weight="bold">HERA節約 {hera_pct}%</text>
+    <text x="4" y="42" font-size="8" fill="#f87171">${orch_cost:.4f}</text>
+    <text x="556" y="42" text-anchor="end" font-size="8" fill="#34d399">節約 ${hera_savings:.4f}</text>
+  </svg>
+</div>"""
+        else:
+            cost_section = f"""
+<hr class="divider">
+<p class="section-title">コスト内訳</p>
+<div class="ts-card" style="max-width:480px;margin-bottom:1rem;">
+  <div style="color:#64748b;font-size:.82rem;">
+    ⚠️ クラウドLLMのトークン使用量が未報告です。<br>
+    <code style="font-size:.75rem;color:#94a3b8;">delegate_task</code> 呼び出し時に
+    <code style="font-size:.75rem;color:#94a3b8;">orchestrator_input_tokens</code> /
+    <code style="font-size:.75rem;color:#94a3b8;">orchestrator_output_tokens</code> を渡すとコスト比較が表示されます。
+  </div>
+  <div style="margin-top:.8rem;">
+    <span class="badge badge-ok">HERA節約額: ${hera_savings:.4f}（全クラウド換算）</span>
+  </div>
+</div>"""
+
         # ── 時系列データ ──────────────────────────────────────────────────
         cum_history: list[dict] = []
         cumsum = 0.0
@@ -448,6 +548,7 @@ class UsageTracker:
             ratio_chart = self._svg_area_chart(ratio_history, "output_ratio_pct", "#f59e0b", "{:.1f}%")
             freq_chart = self._svg_bar_chart(freq_history, "count", "#a78bfa", "{:.0f}回")
             category_chart = self._svg_category_chart(history)
+            orch_history = [h for h in history if h.get("orch_cost_usd", 0) > 0]
 
             recent = history[-10:][::-1]
             rows = ""
@@ -456,6 +557,8 @@ class UsageTracker:
                 task_short = (h.get("task") or "")[:40] + ("…" if len(h.get("task","")) > 40 else "")
                 deleg = f'<span style="color:#f59e0b">{h["delegations"]} 件</span>' if h["delegations"] else '<span style="color:#34d399">なし</span>'
                 ratio_pct = f'{h.get("output_ratio",0)*100:.0f}%'
+                oc = h.get("orch_cost_usd", 0)
+                orch_cell = f'<span style="color:#f87171">${oc:.4f}</span>' if oc else '<span style="color:#475569">—</span>'
                 rows += f"""<tr>
                   <td>{h["ts"].replace("_"," ")}</td>
                   <td><span class="cat-badge">{cat}</span></td>
@@ -463,9 +566,15 @@ class UsageTracker:
                   <td>{h["total_tokens"]:,}</td>
                   <td>{ratio_pct}</td>
                   <td style="color:#34d399">${h["savings_usd"]:.4f}</td>
+                  <td>{orch_cell}</td>
                   <td>{h["elapsed_s"]}s</td>
                   <td>{deleg}</td>
                 </tr>"""
+
+            orch_cost_chart = (
+                f'<div class="ts-card"><div class="ts-label">クラウドLLM実費の推移 (USD)</div>'
+                f'{self._svg_area_chart(orch_history, "orch_cost_usd", "#f87171", "${:.4f}")}</div>'
+            ) if len(orch_history) >= 2 else ""
 
             timeseries_html = f"""
 <hr class="divider">
@@ -476,6 +585,7 @@ class UsageTracker:
   <div class="ts-card"><div class="ts-label">出力効率の推移 (%)</div>{ratio_chart}</div>
   <div class="ts-card"><div class="ts-label">1日あたりの利用回数</div>{freq_chart}</div>
 </div>
+{"<div class='ts-grid'>" + orch_cost_chart + "</div>" if orch_cost_chart else ""}
 
 <hr class="divider">
 <p class="section-title">タスク種別の分布</p>
@@ -487,7 +597,7 @@ class UsageTracker:
 <table class="run-table">
   <thead><tr>
     <th>日時</th><th>カテゴリ</th><th>タスク概要</th>
-    <th>トークン</th><th>出力効率</th><th>節約額</th><th>時間</th><th>クラウド委譲</th>
+    <th>トークン</th><th>出力効率</th><th>HERA節約</th><th>クラウド実費</th><th>時間</th><th>委譲</th>
   </tr></thead>
   <tbody>{rows}</tbody>
 </table>
@@ -615,6 +725,8 @@ class UsageTracker:
 <hr class="divider">
 <p class="section-title">ステップ別所要時間</p>
 <div class="ts-card" style="max-width:560px;">{step_time_svg}</div>
+
+{cost_section}
 
 {timeseries_html}
 

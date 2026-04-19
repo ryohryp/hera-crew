@@ -131,9 +131,21 @@ class HeraCrew:
             return antigravity_delegate_tool(**arguments)
         return f"Tool '{name}' not found."
 
-    async def run(self, user_request: str):
+    async def run(
+        self,
+        user_request: str,
+        orchestrator_input_tokens: int = 0,
+        orchestrator_output_tokens: int = 0,
+        orchestrator_model: str = "",
+    ):
         self.tracker.register_litellm(self.model_cfg['model'])
         self.tracker.set_task(user_request)
+        if orchestrator_input_tokens or orchestrator_output_tokens:
+            self.tracker.record_orchestrator_usage(
+                orchestrator_input_tokens,
+                orchestrator_output_tokens,
+                orchestrator_model,
+            )
         final_result = ""
         try:
             with HeraUI(self.model_cfg['model']) as ui:

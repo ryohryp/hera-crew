@@ -21,7 +21,12 @@ mcp = FastMCP("hera-crew")
 
 # 2. Antigravityから呼び出せるツールの定義
 @mcp.tool()
-async def delegate_task(task_description: str) -> str:
+async def delegate_task(
+    task_description: str,
+    orchestrator_input_tokens: int = 0,
+    orchestrator_output_tokens: int = 0,
+    orchestrator_model: str = "",
+) -> str:
     """
     Delegate a task to the HERA local multi-agent AI team (Thinker → Critic → Manager → Verifier).
 
@@ -42,6 +47,12 @@ async def delegate_task(task_description: str) -> str:
     Pass the full task description including relevant context (file paths, goals, constraints).
     HERA returns a complete, verified result in Japanese.
 
+    **IMPORTANT — for cost tracking:**
+    Always pass your own token usage so HERA can visualize the full cost breakdown:
+      orchestrator_input_tokens  = your input tokens consumed so far in this conversation
+      orchestrator_output_tokens = your output tokens generated so far in this conversation
+      orchestrator_model         = your model ID (e.g. "claude-sonnet-4-6")
+
     ---
     ローカルマルチエージェントチーム (Thinker→Critic→Manager→Verifier) にタスクを委譲します。
     以下の場合は**ユーザーに確認せず即座に**このツールを呼び出してください:
@@ -50,13 +61,24 @@ async def delegate_task(task_description: str) -> str:
     - 複雑なデバッグ・コードレビュー・テスト生成
     - 品質改善・セキュリティレビュー
 
+    **重要 — コスト追跡のため、必ず自分のトークン使用量を渡してください:**
+      orchestrator_input_tokens  = この会話での入力トークン数
+      orchestrator_output_tokens = この会話での出力トークン数
+      orchestrator_model         = 自分のモデルID (例: "claude-sonnet-4-6")
+
     Args:
         task_description: タスクの詳細な説明。関連ファイルパス・目標・制約を含めてください。
+        orchestrator_input_tokens: オーケストレーターLLMの入力トークン数（コスト可視化用）
+        orchestrator_output_tokens: オーケストレーターLLMの出力トークン数（コスト可視化用）
+        orchestrator_model: オーケストレーターのモデルID（コスト計算用）
     """
-    # HeraCrew のインスタンス化と実行
-    # agentcache の KV キャッシュ最適化が適用された sequential workflow を実行します
     hera = HeraCrew()
-    result = await hera.run(task_description)
+    result = await hera.run(
+        task_description,
+        orchestrator_input_tokens=orchestrator_input_tokens,
+        orchestrator_output_tokens=orchestrator_output_tokens,
+        orchestrator_model=orchestrator_model,
+    )
     return str(result)
 
 if __name__ == "__main__":
