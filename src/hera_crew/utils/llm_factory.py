@@ -45,7 +45,7 @@ class LLMFactory:
         if not model:
             model = model_cfg.get('model')
             
-        timeout = model_cfg.get('timeout', 120)
+        timeout = model_cfg.get('timeout', 600)
         num_ctx = model_cfg.get('num_ctx', 32768)
         base_url = os.getenv("OLLAMA_BASE_URL", config.get("default_ollama_base_url"))
 

@@ -20,6 +20,13 @@ class _CallRecord:
     prompt_tokens: int
     completion_tokens: int
 
+@dataclass
+class _ErrorRecord:
+    step: str
+    model: str
+    error_message: str
+    ts: str
+
 
 @dataclass
 class _StepSummary:
@@ -99,6 +106,7 @@ class UsageTracker:
         self._orch_input_tokens: int = 0
         self._orch_output_tokens: int = 0
         self._orch_model: str = ""
+        self._errors: list[_ErrorRecord] = []
 
     def register_litellm(self, model_name: str = "") -> None:
         self._model_name = model_name
@@ -116,7 +124,16 @@ class UsageTracker:
                 completion_tokens=getattr(usage, "completion_tokens", 0) or 0,
             ))
 
+        def _on_failure(e, kwargs, response_obj, start_time, end_time):
+            tracker._errors.append(_ErrorRecord(
+                step=tracker._current_step,
+                model=kwargs.get("model", "unknown"),
+                error_message=str(e),
+                ts=datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            ))
+
         litellm.success_callback.append(_on_success)
+        litellm.failure_callback.append(_on_failure)
 
     def set_task(self, description: str) -> None:
         self._task = description[:120]
@@ -274,6 +291,10 @@ class UsageTracker:
             "orch_output_tokens": self._orch_output_tokens,
             "orch_model": self._orch_model,
             "orch_cost_usd": round(self.orchestrator_cost_usd, 6),
+            "errors": [
+                {"step": e.step, "model": e.model, "msg": e.error_message, "ts": e.ts}
+                for e in self._errors
+            ],
         }
         with open(output_dir / "history.jsonl", "a", encoding="utf-8") as f:
             f.write(json.dumps(entry, ensure_ascii=False) + "\n")

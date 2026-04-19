@@ -46,3 +46,8 @@ def setup_environment():
     # Set LiteLLM global request timeout for local large models (26B+ on Ollama)
     import litellm
     litellm.request_timeout = int(os.getenv("LITELLM_REQUEST_TIMEOUT", "600"))
+
+    # Enable verbose logging if HERA_DEBUG is set
+    if os.getenv("HERA_DEBUG", "").lower() == "true":
+        litellm.set_verbose = True
+        print("[HERA] Verbose logging enabled (HERA_DEBUG=true)")
