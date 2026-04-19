@@ -117,20 +117,11 @@ class HeraCrew:
         self.config_path = Path(__file__).parent / "config"
         self.tasks_config = self._load_yaml("tasks.yaml")
 
-        self.provider = LiteLLMSDKProvider()
         self.model_cfg = LLMFactory.create_llm_config('hera', 'manager', "MANAGER_MODEL")
+        timeout_val = float(os.getenv("LITELLM_REQUEST_TIMEOUT", str(self.model_cfg.get('timeout', 1200))))
+        self.provider = LiteLLMSDKProvider(default_timeout_s=timeout_val)
         self.shared_system_prompt = self._create_unified_prompt()
         self.tracker = UsageTracker()
-        
-        # Ensure LiteLLM respects the configured timeout (600s for large local models)
-        timeout_val = self.model_cfg.get('timeout', 600)
-        os.environ["LITELLM_REQUEST_TIMEOUT"] = str(timeout_val)
-        os.environ["LITELLM_TIMEOUT"] = str(timeout_val)
-        
-        import litellm
-        litellm.request_timeout = int(timeout_val)
-        # Some providers ignore request_timeout, so we also set it on the provider if possible
-        # but LiteLLMSDKProvider should use the global litellm settings.
 
     def _load_yaml(self, filename: str) -> dict:
         path = self.config_path / filename
