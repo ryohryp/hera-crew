@@ -6,40 +6,40 @@ default_ollama_base_url: "http://localhost:11434"
 hera:
   manager:
     model: "ollama/deepseek-r1:14b"
-    timeout: 600
+    timeout: 1200
     num_ctx: 32768
   thinker:
     model: "ollama/gemma4:26b"
-    timeout: 600
+    timeout: 1200
     num_ctx: 32768
   critic:
     model: "ollama/phi4:latest"
-    timeout: 300
+    timeout: 1200
     num_ctx: 32768
   tool_calling:
     model: "ollama/qwen2.5:14b"
-    timeout: 300
+    timeout: 1200
     num_ctx: 8192
 
 # General Crew Models (Used in mcp_crew_server.py)
 general:
   analyst:
     model: "ollama/qwen2.5:14b"
-    timeout: 600
+    timeout: 1200
     num_ctx: 32768
   specialist:
     model: "ollama/qwen2.5-coder:14b"
-    timeout: 600
+    timeout: 1200
     num_ctx: 32768
   reviewer:
     model: "ollama/deepseek-r1:14b"
-    timeout: 600
+    timeout: 1200
     num_ctx: 32768
   planner:
     model: "ollama/qwen2.5:14b"
-    timeout: 600
+    timeout: 1200
     num_ctx: 32768
   coder:
     model: "ollama/qwen2.5-coder:14b"
-    timeout: 600
+    timeout: 1200
     num_ctx: 32768

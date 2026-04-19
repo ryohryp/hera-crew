@@ -362,7 +362,7 @@ class UsageTracker:
             x = PL + i * (inner_w / n) + bar_w / 2
             labels += (
                 f'<text x="{x:.1f}" y="{H-6}" text-anchor="middle"'
-                f' font-size="8" fill="#475569">{history[i]["ts"][5:10]}</text>'
+                f' font-size="8" fill="#475569">{history[i]["ts"][5:10] + " " + history[i]["ts"][11:16].replace("-", ":")}</text>'
             )
         if vals:
             last_x = PL + (n - 1) * (inner_w / n) + bar_w / 2
@@ -396,7 +396,7 @@ class UsageTracker:
         for i in range(0, n, step):
             labels += (
                 f'<text x="{px(i):.1f}" y="{H-6}" text-anchor="middle"'
-                f' font-size="8" fill="#475569">{history[i]["ts"][5:10]}</text>'
+                f' font-size="8" fill="#475569">{history[i]["ts"][5:10] + " " + history[i]["ts"][11:16].replace("-", ":")}</text>'
             )
         lx, ly = px(n - 1), py(vals[-1]) - 4
         labels += (

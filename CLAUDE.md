@@ -20,7 +20,7 @@ mcp__hera-crew__delegate_task(
     task_description="<full task with file paths, goals, constraints>",
     orchestrator_input_tokens=<your input tokens so far>,
     orchestrator_output_tokens=<your output tokens so far>,
-    orchestrator_model="claude-sonnet-4-6"
+    orchestrator_model="claude-opus-4-6"
 )
 ```
 
