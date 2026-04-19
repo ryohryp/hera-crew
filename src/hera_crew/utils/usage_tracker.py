@@ -320,7 +320,7 @@ class UsageTracker:
         max_val = max(vals) or 1
         n = len(vals)
         W, H = 560, 110
-        PL, PR, PT, PB = 8, 8, 8, 24
+        PL, PR, PT, PB = 10, 10, 16, 28
         inner_w = W - PL - PR
         bar_w = max(2, inner_w / n - 2)
 
@@ -360,7 +360,7 @@ class UsageTracker:
         if n < 2:
             return self._svg_bar_chart(history, metric, color, fmt)
         W, H = 560, 110
-        PL, PR, PT, PB = 8, 8, 8, 24
+        PL, PR, PT, PB = 10, 10, 16, 28
 
         def px(i: int) -> float:
             return PL + i * (W - PL - PR) / (n - 1)
@@ -396,7 +396,7 @@ class UsageTracker:
         max_val = max(v for _, v in items) or 1
         W, H_ROW = 560, 22
         H = H_ROW * len(items) + 4
-        PL, PR = 110, 60
+        PL, PR = 140, 80
 
         bars = ""
         for i, (label, val) in enumerate(items):
