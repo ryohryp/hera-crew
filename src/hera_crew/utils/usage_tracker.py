@@ -36,14 +36,33 @@ class _StepSummary:
 # ── task keyword classifier ───────────────────────────────────────────────────
 
 _CLOUD_PRICING: dict[str, tuple[float, float]] = {
-    "claude-sonnet-4-6":         (3.00 / 1_000_000, 15.00 / 1_000_000),
+    # Claude
+    "claude-sonnet-4-6":         (3.00  / 1_000_000, 15.00 / 1_000_000),
     "claude-opus-4-7":           (15.00 / 1_000_000, 75.00 / 1_000_000),
-    "claude-haiku-4-5":          (0.80 / 1_000_000, 4.00 / 1_000_000),
-    "gpt-4o":                    (2.50 / 1_000_000, 10.00 / 1_000_000),
-    "gpt-4o-mini":               (0.15 / 1_000_000, 0.60 / 1_000_000),
-    "gemini-2.0-flash":          (0.10 / 1_000_000, 0.40 / 1_000_000),
+    "claude-haiku-4-5":          (0.80  / 1_000_000,  4.00 / 1_000_000),
+    # OpenAI
+    "gpt-4o":                    (2.50  / 1_000_000, 10.00 / 1_000_000),
+    "gpt-4o-mini":               (0.15  / 1_000_000,  0.60 / 1_000_000),
+    # Gemini
+    "gemini-2.5-pro":            (1.25  / 1_000_000, 10.00 / 1_000_000),
+    "gemini-2.5-flash":          (0.15  / 1_000_000,  0.60 / 1_000_000),
+    "gemini-2.0-flash":          (0.10  / 1_000_000,  0.40 / 1_000_000),
+    "gemini-1.5-pro":            (1.25  / 1_000_000,  5.00 / 1_000_000),
+    "gemini-1.5-flash":          (0.075 / 1_000_000,  0.30 / 1_000_000),
 }
 _DEFAULT_ORCHESTRATOR_PRICING = (3.00 / 1_000_000, 15.00 / 1_000_000)  # Claude Sonnet 4.6
+
+
+def _get_pricing(model_id: str) -> tuple[float, float]:
+    """Look up per-token pricing, stripping provider prefixes like 'gemini/' or 'google/'."""
+    key = model_id.lower()
+    if key in _CLOUD_PRICING:
+        return _CLOUD_PRICING[key]
+    if "/" in key:
+        bare = key.split("/", 1)[-1]
+        if bare in _CLOUD_PRICING:
+            return _CLOUD_PRICING[bare]
+    return _DEFAULT_ORCHESTRATOR_PRICING
 
 _TASK_CATEGORIES: list[tuple[str, list[str]]] = [
     ("コード生成",   ["作成", "書いて", "実装", "generate", "create", "write", "implement"]),
@@ -160,8 +179,7 @@ class UsageTracker:
     def orchestrator_cost_usd(self) -> float:
         if not (self._orch_input_tokens or self._orch_output_tokens):
             return 0.0
-        key = self._orch_model.lower()
-        in_price, out_price = _CLOUD_PRICING.get(key, _DEFAULT_ORCHESTRATOR_PRICING)
+        in_price, out_price = _get_pricing(self._orch_model)
         return self._orch_input_tokens * in_price + self._orch_output_tokens * out_price
 
     @property
@@ -171,8 +189,7 @@ class UsageTracker:
     @property
     def estimated_savings_vs_orchestrator(self) -> float:
         """HERAの節約額をオーケストレーターモデルと同じレートで計算"""
-        key = self._orch_model.lower() if self._orch_model else ""
-        in_p, out_p = _CLOUD_PRICING.get(key, _DEFAULT_ORCHESTRATOR_PRICING)
+        in_p, out_p = _get_pricing(self._orch_model)
         return self.total_prompt_tokens * in_p + self.total_completion_tokens * out_p
 
     @property
@@ -442,7 +459,7 @@ class UsageTracker:
         if self.has_orchestrator_data:
             hera_savings = self.estimated_savings_vs_orchestrator
             savings_ref_label = self._orch_model or "Claude Sonnet 4.6"
-            in_p, out_p = _CLOUD_PRICING.get(savings_ref_label.lower(), _DEFAULT_ORCHESTRATOR_PRICING)
+            in_p, out_p = _get_pricing(savings_ref_label)
             savings_ref_price_str = f"入力 ${in_p*1_000_000:.2f} / 出力 ${out_p*1_000_000:.2f} per 1M tok"
         else:
             hera_savings = self.estimated_cloud_savings_usd
