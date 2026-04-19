@@ -112,6 +112,8 @@ class HeraCrew:
         self.model_cfg = LLMFactory.create_llm_config('hera', 'manager', "MANAGER_MODEL")
         self.shared_system_prompt = self._create_unified_prompt()
         self.tracker = UsageTracker()
+        # Ensure LiteLLM respects the configured timeout
+        os.environ["LITELLM_TIMEOUT"] = str(self.model_cfg.get('timeout', 600))
 
     def _load_yaml(self, filename: str) -> dict:
         path = self.config_path / filename
@@ -169,6 +171,8 @@ class HeraCrew:
                 )
                 fork = await session.fork(prompt=prompt, policy=ForkPolicy.cache_safe_ephemeral())
                 decomposition_result = fork.final_text
+                if hasattr(fork, "usage"):
+                    self.tracker.record_usage(fork.usage.input_tokens, fork.usage.output_tokens)
                 ui.complete_step(1, decomposition_result)
 
                 # Step 2: Logic Evaluation
@@ -185,6 +189,8 @@ class HeraCrew:
                 )
                 fork = await session.fork(prompt=prompt, policy=ForkPolicy.cache_safe_ephemeral())
                 evaluation_result = fork.final_text
+                if hasattr(fork, "usage"):
+                    self.tracker.record_usage(fork.usage.input_tokens, fork.usage.output_tokens)
                 ui.complete_step(2, evaluation_result)
 
                 # Step 3: Execution & Routing
@@ -207,6 +213,8 @@ class HeraCrew:
                     policy=execution_policy,
                 )
                 execution_result = fork.final_text
+                if hasattr(fork, "usage"):
+                    self.tracker.record_usage(fork.usage.input_tokens, fork.usage.output_tokens)
                 session.tools = []
                 if not execution_result:
                     fork = await session.fork(
@@ -235,6 +243,8 @@ class HeraCrew:
                 )
                 fork = await session.fork(prompt=prompt, policy=ForkPolicy.cache_safe_ephemeral())
                 final_result = fork.final_text or execution_result
+                if hasattr(fork, "usage"):
+                    self.tracker.record_usage(fork.usage.input_tokens, fork.usage.output_tokens)
                 ui.complete_step(4, final_result)
 
         finally:

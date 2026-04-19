@@ -150,6 +150,17 @@ class UsageTracker:
         self._orch_output_tokens = output_tokens
         self._orch_model = model or "claude-sonnet-4-6"
 
+    def record_usage(self, prompt_tokens: int, completion_tokens: int, model: str = "") -> None:
+        """Manually record token usage from a specific call."""
+        if not (prompt_tokens or completion_tokens):
+            return
+        self._records.append(_CallRecord(
+            step=self._current_step,
+            model=model or self._model_name or "unknown",
+            prompt_tokens=prompt_tokens,
+            completion_tokens=completion_tokens,
+        ))
+
     # ── aggregated stats ──────────────────────────────────────────────────────
 
     @property
@@ -477,8 +488,7 @@ class UsageTracker:
 </div>"""
         elif hera_savings > 0:
             summary_html = f"""<div class="summary-callout">
-  HERAで <span style="color:#34d399;font-weight:600;">${hera_savings:.4f}</span> 節約（vs {savings_ref_label}）&nbsp;·&nbsp;
-  <span style="color:#64748b;">クラウドLLMのトークン使用量は未報告</span>
+  <span style="color:#34d399;font-weight:600;">${hera_savings:.4f}</span> 節約（vs {savings_ref_label}）
 </div>"""
         else:
             summary_html = ""
