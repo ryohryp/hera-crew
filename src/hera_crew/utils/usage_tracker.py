@@ -40,6 +40,14 @@ class _StepSummary:
         return self.prompt_tokens + self.completion_tokens
 
 
+PIPELINE_STEPS = ["Task Decomposition", "Logic Evaluation", "Execution & Routing", "Final Verification"]
+_PIPELINE_AGENTS = {
+    "Task Decomposition":  ("Thinker",  "#6366f1"),
+    "Logic Evaluation":    ("Critic",   "#22d3ee"),
+    "Execution & Routing": ("Manager",  "#f59e0b"),
+    "Final Verification":  ("Verifier", "#34d399"),
+}
+
 # ── task keyword classifier ───────────────────────────────────────────────────
 
 _CLOUD_PRICING: dict[str, tuple[float, float]] = {
@@ -294,6 +302,10 @@ class UsageTracker:
     # ── history persistence ───────────────────────────────────────────────────
 
     def _append_history(self, ts: str, elapsed: float, output_dir: Path) -> None:
+        steps_completed = list(self._step_elapsed.keys())
+        pipeline_complete = all(s in self._step_elapsed for s in PIPELINE_STEPS)
+        step_summaries = {s.name: {"prompt": s.prompt_tokens, "completion": s.completion_tokens, "total": s.total}
+                          for s in self._step_summaries()}
         entry = {
             "ts": ts,
             "task": self._task,
@@ -308,6 +320,9 @@ class UsageTracker:
             "delegations": self._delegations,
             "model": self._model_name,
             "step_elapsed": {k: round(v, 1) for k, v in self._step_elapsed.items()},
+            "steps_completed": steps_completed,
+            "pipeline_complete": pipeline_complete,
+            "step_tokens": step_summaries,
             "orch_input_tokens": self._orch_input_tokens,
             "orch_output_tokens": self._orch_output_tokens,
             "orch_model": self._orch_model,
@@ -456,6 +471,182 @@ class UsageTracker:
         items = sorted(counts.items(), key=lambda x: -x[1])
         return self._svg_hbar([(k, v) for k, v in items], "#f59e0b", "{:.0f}件")
 
+    def _svg_pipeline_flow(self) -> str:
+        """Current-run pipeline flow diagram with 4 stages, time, and completion status."""
+        W, H = 620, 110
+        box_w, box_h = 120, 64
+        gap = 16
+        start_x = (W - (4 * box_w + 3 * gap)) / 2
+        arrow_w = gap
+
+        svg = f'<svg viewBox="0 0 {W} {H}" style="width:100%;height:auto;">'
+        for i, step in enumerate(PIPELINE_STEPS):
+            agent, color = _PIPELINE_AGENTS[step]
+            ran = step in self._step_elapsed
+            t = self._step_elapsed.get(step, 0.0)
+            fill = f"{color}22" if ran else "#1a1a2e"
+            stroke = color if ran else "#2d2d44"
+            text_col = color if ran else "#475569"
+            status_icon = "✓" if ran else "–"
+
+            x = start_x + i * (box_w + gap)
+            y = (H - box_h) / 2
+
+            svg += (
+                f'<rect x="{x:.1f}" y="{y:.1f}" width="{box_w}" height="{box_h}"'
+                f' rx="8" fill="{fill}" stroke="{stroke}" stroke-width="1.5"/>'
+                f'<text x="{x+box_w/2:.1f}" y="{y+14:.1f}" text-anchor="middle"'
+                f' font-size="8" fill="{text_col}" font-weight="600">{status_icon} {agent}</text>'
+                f'<text x="{x+box_w/2:.1f}" y="{y+28:.1f}" text-anchor="middle"'
+                f' font-size="7.5" fill="#64748b">{step}</text>'
+            )
+            if ran:
+                svg += (
+                    f'<text x="{x+box_w/2:.1f}" y="{y+46:.1f}" text-anchor="middle"'
+                    f' font-size="10" fill="{color}" font-weight="700">{t:.1f}s</text>'
+                )
+            else:
+                svg += (
+                    f'<text x="{x+box_w/2:.1f}" y="{y+46:.1f}" text-anchor="middle"'
+                    f' font-size="9" fill="#334155">skipped</text>'
+                )
+
+            if i < 3:
+                ax = x + box_w + 2
+                ay = H / 2
+                svg += (
+                    f'<line x1="{ax:.1f}" y1="{ay:.1f}" x2="{ax+arrow_w-4:.1f}" y2="{ay:.1f}"'
+                    f' stroke="#334155" stroke-width="1.5"/>'
+                    f'<polygon points="{ax+arrow_w-4:.1f},{ay-4} {ax+arrow_w:.1f},{ay} {ax+arrow_w-4:.1f},{ay+4}"'
+                    f' fill="#334155"/>'
+                )
+        svg += "</svg>"
+        return svg
+
+    def _svg_stage_funnel(self, history: list[dict]) -> str:
+        """Bar chart showing how many history runs reached each pipeline stage."""
+        if not history:
+            return ""
+        counts = {s: 0 for s in PIPELINE_STEPS}
+        for h in history:
+            for s in h.get("steps_completed", list(h.get("step_elapsed", {}).keys())):
+                if s in counts:
+                    counts[s] += 1
+        total = len(history)
+        items = [(s, counts[s]) for s in PIPELINE_STEPS]
+
+        W, H_ROW = 560, 28
+        H = H_ROW * len(items) + 4
+        PL, PR = 160, 90
+
+        bars = ""
+        for i, (step, cnt) in enumerate(items):
+            agent, color = _PIPELINE_AGENTS[step]
+            pct = cnt / total if total else 0
+            y = i * H_ROW + 2
+            bw = max(2, pct * (W - PL - PR))
+            bars += (
+                f'<text x="{PL-8}" y="{y+18}" text-anchor="end" font-size="9" fill="#94a3b8">'
+                f'{agent} / {step}</text>'
+                f'<rect x="{PL}" y="{y+6}" width="{W-PL-PR}" height="16" fill="#2d2d44" rx="3"/>'
+                f'<rect x="{PL}" y="{y+6}" width="{bw:.1f}" height="16" fill="{color}cc" rx="3"/>'
+                f'<text x="{PL+bw+6:.1f}" y="{y+18}" font-size="9" fill="{color}">'
+                f'{cnt}/{total} ({pct:.0%})</text>'
+            )
+        return f'<svg viewBox="0 0 {W} {H}" style="width:100%;height:auto;">{bars}</svg>'
+
+    def _svg_stage_avg_times(self, history: list[dict]) -> str:
+        """Horizontal bar chart of average elapsed time per stage across history."""
+        if not history:
+            return ""
+        totals: dict[str, float] = {s: 0.0 for s in PIPELINE_STEPS}
+        cnts: dict[str, int] = {s: 0 for s in PIPELINE_STEPS}
+        for h in history:
+            for s, t in h.get("step_elapsed", {}).items():
+                if s in totals:
+                    totals[s] += t
+                    cnts[s] += 1
+        avgs = [(s, totals[s] / cnts[s] if cnts[s] else 0.0) for s in PIPELINE_STEPS]
+        max_val = max(v for _, v in avgs) or 1
+        W, H_ROW = 560, 28
+        H = H_ROW * len(avgs) + 4
+        PL, PR = 160, 80
+
+        bars = ""
+        for i, (step, avg) in enumerate(avgs):
+            agent, color = _PIPELINE_AGENTS[step]
+            y = i * H_ROW + 2
+            bw = max(2, (avg / max_val) * (W - PL - PR)) if avg else 0
+            bars += (
+                f'<text x="{PL-8}" y="{y+18}" text-anchor="end" font-size="9" fill="#94a3b8">'
+                f'{agent}</text>'
+                f'<rect x="{PL}" y="{y+6}" width="{W-PL-PR}" height="16" fill="#2d2d44" rx="3"/>'
+            )
+            if bw > 0:
+                bars += (
+                    f'<rect x="{PL}" y="{y+6}" width="{bw:.1f}" height="16" fill="{color}cc" rx="3"/>'
+                    f'<text x="{PL+bw+6:.1f}" y="{y+18}" font-size="9" fill="{color}">{avg:.1f}s</text>'
+                )
+            else:
+                bars += f'<text x="{PL+6}" y="{y+18}" font-size="9" fill="#475569">—</text>'
+        return f'<svg viewBox="0 0 {W} {H}" style="width:100%;height:auto;">{bars}</svg>'
+
+    def _svg_stage_time_trend(self, history: list[dict]) -> str:
+        """Multi-line area chart showing each stage's elapsed time across runs."""
+        runs = [h for h in history if h.get("step_elapsed")]
+        if len(runs) < 2:
+            return ""
+        n = len(runs)
+        W, H = 560, 130
+        PL, PR, PT, PB = 10, 90, 12, 28
+
+        def px(i: int) -> float:
+            return PL + i * (W - PL - PR) / max(n - 1, 1)
+        def py(v: float, max_v: float) -> float:
+            return PT + (1 - v / max_v) * (H - PT - PB)
+
+        all_vals = [h["step_elapsed"].get(s, 0) for h in runs for s in PIPELINE_STEPS]
+        max_v = max(all_vals) or 1
+
+        lines = ""
+        for step in PIPELINE_STEPS:
+            agent, color = _PIPELINE_AGENTS[step]
+            vals = [h["step_elapsed"].get(step, None) for h in runs]
+            segments: list[str] = []
+            cur: list[str] = []
+            for i, v in enumerate(vals):
+                if v is not None:
+                    cur.append(f"{px(i):.1f},{py(v, max_v):.1f}")
+                else:
+                    if len(cur) >= 2:
+                        segments.append(" ".join(cur))
+                    cur = []
+            if len(cur) >= 2:
+                segments.append(" ".join(cur))
+            for seg in segments:
+                lines += (
+                    f'<polyline points="{seg}" fill="none" stroke="{color}"'
+                    f' stroke-width="1.5" stroke-opacity="0.8"/>'
+                )
+            last_idx = next((i for i in range(n - 1, -1, -1) if vals[i] is not None), None)
+            if last_idx is not None and vals[last_idx] is not None:
+                lx, ly = px(last_idx), py(vals[last_idx], max_v)
+                lines += (
+                    f'<circle cx="{lx:.1f}" cy="{ly:.1f}" r="3" fill="{color}"/>'
+                    f'<text x="{W-PR+6}" y="{ly+4:.1f}" font-size="8" fill="{color}">'
+                    f'{agent}</text>'
+                )
+
+        labels = ""
+        step_n = max(1, n // 5)
+        for i in range(0, n, step_n):
+            x = px(i)
+            labels += (
+                f'<text x="{x:.1f}" y="{H-6}" text-anchor="middle"'
+                f' font-size="7.5" fill="#475569">{runs[i]["ts"][5:10]}</text>'
+            )
+        return f'<svg viewBox="0 0 {W} {H}" style="width:100%;height:auto;">{lines}{labels}</svg>'
+
     # ── HTML infographic ──────────────────────────────────────────────────────
 
     def save_html(self, output_dir: Path | None = None) -> Path:
@@ -576,6 +767,85 @@ class UsageTracker:
 <hr class="divider">
 <p class="section-title">ステップ別所要時間</p>
 <div class="ts-card" style="max-width:560px;">{step_time_svg}</div>""" if step_time_svg else ""
+
+        # ── パイプライン効果分析 ──────────────────────────────────────────
+        steps_ran = list(self._step_elapsed.keys())
+        n_steps_ran = sum(1 for s in PIPELINE_STEPS if s in self._step_elapsed)
+        pipeline_complete_now = n_steps_ran == len(PIPELINE_STEPS)
+        completion_color = "#34d399" if pipeline_complete_now else "#f59e0b" if n_steps_ran >= 2 else "#f87171"
+        completion_label = "完走" if pipeline_complete_now else f"{n_steps_ran}/4 ステージ完了"
+
+        pipeline_flow_svg = self._svg_pipeline_flow()
+
+        # historical pipeline stats
+        hist_complete_count = sum(1 for h in history if h.get("pipeline_complete", len(h.get("step_elapsed", {})) == 4))
+        hist_complete_pct = hist_complete_count / len(history) * 100 if history else 0
+        funnel_svg = self._svg_stage_funnel(history)
+        avg_times_svg = self._svg_stage_avg_times(history)
+        trend_svg = self._svg_stage_time_trend(history)
+
+        # bottleneck: slowest stage in this run
+        if self._step_elapsed:
+            bottleneck_step = max(self._step_elapsed, key=lambda s: self._step_elapsed[s])
+            bottleneck_agent = _PIPELINE_AGENTS.get(bottleneck_step, (bottleneck_step, "#f59e0b"))[0]
+            bottleneck_time = self._step_elapsed[bottleneck_step]
+            bottleneck_html = (
+                f'<span class="badge badge-warn">ボトルネック: {bottleneck_agent} ({bottleneck_time:.1f}s)</span>'
+            )
+        else:
+            bottleneck_html = ""
+
+        hist_funnel_section = f"""
+<div class="ts-grid" style="grid-template-columns:1fr 1fr;">
+  <div class="ts-card">
+    <div class="ts-label">ステージ到達率（{len(history)} 回分）</div>
+    {funnel_svg}
+  </div>
+  <div class="ts-card">
+    <div class="ts-label">ステージ別平均所要時間</div>
+    {avg_times_svg}
+  </div>
+</div>""" if history else ""
+
+        hist_trend_section = f"""
+<div class="ts-card" style="margin-bottom:1rem;">
+  <div class="ts-label">ステージ別所要時間の推移</div>
+  {trend_svg}
+  <div style="display:flex;gap:1.2rem;margin-top:.5rem;flex-wrap:wrap;">
+    {''.join(f'<span style="font-size:.72rem;color:{_PIPELINE_AGENTS[s][1]}">● {_PIPELINE_AGENTS[s][0]}</span>' for s in PIPELINE_STEPS)}
+  </div>
+</div>""" if trend_svg else ""
+
+        pipeline_section = f"""
+<hr class="divider">
+<p class="section-title">パイプライン効果分析</p>
+<div class="ts-card" style="margin-bottom:1rem;">
+  <div class="ts-label">今回の実行フロー</div>
+  {pipeline_flow_svg}
+  <div style="margin-top:.6rem;display:flex;gap:.8rem;align-items:center;flex-wrap:wrap;">
+    <span class="badge" style="background:#{'064e3b' if pipeline_complete_now else '451a03'};color:{completion_color};">{completion_label}</span>
+    {bottleneck_html}
+  </div>
+</div>
+<div class="grid" style="grid-template-columns:1fr 1fr 1fr;margin-bottom:1rem;">
+  <div class="card" style="border-color:{completion_color};">
+    <div class="card-label">パイプライン完走率</div>
+    <div class="card-value" style="color:{completion_color};font-size:1.6rem;">{hist_complete_pct:.0f}%</div>
+    <div class="ref">{hist_complete_count}/{len(history) if history else 0} 回が全 4 ステージ完了</div>
+  </div>
+  <div class="card" style="border-color:#f59e0b;">
+    <div class="card-label">今回の完了ステージ数</div>
+    <div class="card-value" style="color:#f59e0b;font-size:1.6rem;">{n_steps_ran} / 4</div>
+    <div class="ref">{'・'.join((_PIPELINE_AGENTS[s][0] if s in self._step_elapsed else f'<span style="color:#334155">{_PIPELINE_AGENTS.get(s, (s,""))[0]}</span>') for s in PIPELINE_STEPS)}</div>
+  </div>
+  <div class="card" style="border-color:#6366f1;">
+    <div class="card-label">合計パイプライン時間</div>
+    <div class="card-value" style="color:#6366f1;font-size:1.6rem;">{sum(self._step_elapsed.values()):.1f}s</div>
+    <div class="ref">全ステージの合計所要時間</div>
+  </div>
+</div>
+{hist_funnel_section}
+{hist_trend_section}"""
 
         # ── ③④⑦ コスト内訳セクション ──────────────────────────────────
         if self.has_orchestrator_data:
@@ -839,6 +1109,8 @@ class UsageTracker:
 {step_token_section}
 
 {step_time_section}
+
+{pipeline_section}
 
 {cost_section}
 
