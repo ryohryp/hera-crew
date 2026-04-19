@@ -44,8 +44,11 @@ def setup_environment():
         os.environ["OLLAMA_NUM_PARALLEL"] = "4"
 
     # Set LiteLLM global request timeout for local large models (26B+ on Ollama)
+    timeout_val = os.getenv("LITELLM_REQUEST_TIMEOUT", "600")
+    os.environ["LITELLM_REQUEST_TIMEOUT"] = timeout_val
+    os.environ["LITELLM_TIMEOUT"] = timeout_val
     import litellm
-    litellm.request_timeout = int(os.getenv("LITELLM_REQUEST_TIMEOUT", "600"))
+    litellm.request_timeout = int(timeout_val)
 
     # Enable verbose logging if HERA_DEBUG is set
     if os.getenv("HERA_DEBUG", "").lower() == "true":

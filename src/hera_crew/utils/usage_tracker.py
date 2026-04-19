@@ -171,12 +171,33 @@ class UsageTracker:
         """Manually record token usage from a specific call."""
         if not (prompt_tokens or completion_tokens):
             return
+        
+        # Avoid duplicate recording for the exact same values in the same step
+        if self._records and self._records[-1].step == self._current_step:
+            last = self._records[-1]
+            if last.prompt_tokens == prompt_tokens and last.completion_tokens == completion_tokens:
+                return
+
         self._records.append(_CallRecord(
             step=self._current_step,
             model=model or self._model_name or "unknown",
             prompt_tokens=prompt_tokens,
             completion_tokens=completion_tokens,
         ))
+
+    def record_agent_usage(self, usage_obj, model: str = "") -> None:
+        """Helper to record usage from an agentcache Usage object or dict."""
+        if not usage_obj:
+            return
+            
+        p = getattr(usage_obj, "input_tokens", 0) or getattr(usage_obj, "prompt_tokens", 0) or 0
+        c = getattr(usage_obj, "output_tokens", 0) or getattr(usage_obj, "completion_tokens", 0) or 0
+        
+        if isinstance(usage_obj, dict):
+            p = usage_obj.get("input_tokens", usage_obj.get("prompt_tokens", 0))
+            c = usage_obj.get("output_tokens", usage_obj.get("completion_tokens", 0))
+
+        self.record_usage(int(p), int(c), model)
 
     # ── aggregated stats ──────────────────────────────────────────────────────
 

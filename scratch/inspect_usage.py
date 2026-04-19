@@ -42,8 +42,8 @@ async def main():
             print(f"Found session.{candidate}")
             
     if hasattr(fork, 'usage'):
-        print(f"Manually recording usage: {fork.usage.input_tokens}, {fork.usage.output_tokens}")
-        tracker.record_usage(fork.usage.input_tokens, fork.usage.output_tokens)
+        print(f"Manually recording usage via record_agent_usage: {fork.usage}")
+        tracker.record_agent_usage(fork.usage)
         
     print(f"Tracker records count: {len(tracker._records)}")
     for r in tracker._records:

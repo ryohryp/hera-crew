@@ -121,8 +121,16 @@ class HeraCrew:
         self.model_cfg = LLMFactory.create_llm_config('hera', 'manager', "MANAGER_MODEL")
         self.shared_system_prompt = self._create_unified_prompt()
         self.tracker = UsageTracker()
-        # Ensure LiteLLM respects the configured timeout
-        os.environ["LITELLM_TIMEOUT"] = str(self.model_cfg.get('timeout', 600))
+        
+        # Ensure LiteLLM respects the configured timeout (600s for large local models)
+        timeout_val = self.model_cfg.get('timeout', 600)
+        os.environ["LITELLM_REQUEST_TIMEOUT"] = str(timeout_val)
+        os.environ["LITELLM_TIMEOUT"] = str(timeout_val)
+        
+        import litellm
+        litellm.request_timeout = int(timeout_val)
+        # Some providers ignore request_timeout, so we also set it on the provider if possible
+        # but LiteLLMSDKProvider should use the global litellm settings.
 
     def _load_yaml(self, filename: str) -> dict:
         path = self.config_path / filename
@@ -135,6 +143,14 @@ class HeraCrew:
             "You execute tasks in the role specified in each message (Thinker / Critic / Manager).\n"
             "Always respond in Japanese."
         )
+
+    def _record_session_usage(self, session_or_fork, model: str = ""):
+        """Helper to extract and record usage from AgentSession or fork objects."""
+        if not session_or_fork:
+            return
+        usage = getattr(session_or_fork, "usage", None)
+        if usage:
+            self.tracker.record_agent_usage(usage, model=model)
 
     async def _tool_executor(self, tool_call_id: str, name: str, arguments: dict) -> str:
         if name == "antigravity_delegate_tool":
@@ -166,6 +182,7 @@ class HeraCrew:
                     system_prompt=self.shared_system_prompt,
                 )
                 await session.respond("System initialization. Awaiting tasks.")
+                self._record_session_usage(session)
 
                 # Step 1: Task Decomposition
                 ui.start_step(1)
@@ -182,8 +199,7 @@ class HeraCrew:
                     )
                     fork = await session.fork(prompt=prompt, policy=ForkPolicy.cache_safe_ephemeral())
                     decomposition_result = fork.final_text
-                    if hasattr(fork, "usage"):
-                        self.tracker.record_usage(fork.usage.input_tokens, fork.usage.output_tokens)
+                    self._record_session_usage(fork)
                     ui.complete_step(1, decomposition_result)
                 except Exception as e:
                     ui.fail_step(1, str(e))
@@ -205,8 +221,7 @@ class HeraCrew:
                     )
                     fork = await session.fork(prompt=prompt, policy=ForkPolicy.cache_safe_ephemeral())
                     evaluation_result = fork.final_text
-                    if hasattr(fork, "usage"):
-                        self.tracker.record_usage(fork.usage.input_tokens, fork.usage.output_tokens)
+                    self._record_session_usage(fork)
                     ui.complete_step(2, evaluation_result)
                 except Exception as e:
                     ui.fail_step(2, str(e))
@@ -234,8 +249,7 @@ class HeraCrew:
                         policy=execution_policy,
                     )
                     execution_result = fork.final_text
-                    if hasattr(fork, "usage"):
-                        self.tracker.record_usage(fork.usage.input_tokens, fork.usage.output_tokens)
+                    self._record_session_usage(fork)
                     session.tools = []
                     if not execution_result:
                         fork = await session.fork(
@@ -247,6 +261,7 @@ class HeraCrew:
                             policy=ForkPolicy.cache_safe_ephemeral(),
                         )
                         execution_result = fork.final_text
+                        self._record_session_usage(fork)
                     ui.complete_step(3, execution_result)
                 except Exception as e:
                     ui.fail_step(3, str(e))
@@ -269,8 +284,7 @@ class HeraCrew:
                     )
                     fork = await session.fork(prompt=prompt, policy=ForkPolicy.cache_safe_ephemeral())
                     final_result = fork.final_text or execution_result
-                    if hasattr(fork, "usage"):
-                        self.tracker.record_usage(fork.usage.input_tokens, fork.usage.output_tokens)
+                    self._record_session_usage(fork)
                     ui.complete_step(4, final_result)
                 except Exception as e:
                     ui.fail_step(4, str(e))
