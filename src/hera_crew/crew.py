@@ -157,16 +157,61 @@ class HeraCrew:
         self.shared_system_prompt = self._create_unified_prompt()
         self.tracker = UsageTracker()
 
-    @staticmethod
-    def _detect_simple_shortcut(text: str) -> str | None:
+    # 早期終了 (SIMPLE shortcut) を弾くキーワード。
+    # ユーザーリクエストにこれらが含まれていたら、Thinker が SIMPLE: で
+    # 返してきても無視して通常分解パスへ進む。
+    _SIMPLE_FORBIDDEN_KEYWORDS = (
+        "実装", "作成", "書いて", "書く", "ファイル", "コード", "スクリプト",
+        "API", "api", "クラス", "関数", "テスト", "test", "メソッド",
+        "リファクタ", "refactor", "デバッグ", "debug", "fix", "修正",
+        "ディレクトリ", "directory", "プロジェクト", "project",
+    )
+    _SIMPLE_MAX_INPUT_LEN = 50  # ユーザーリクエストがこれを超えたら早期終了禁止
+
+    @classmethod
+    def _is_simple_eligible(cls, user_request: str) -> bool:
+        """
+        ユーザーリクエストが早期終了 (SIMPLE shortcut) の対象になり得るか判定。
+        以下のいずれかに該当する場合は False (= SIMPLE 禁止):
+          - 50文字超
+          - コード生成系キーワードを含む
+          - 番号付きリスト (1. 2.) などの複数項目構造を含む
+          - 複数行構造 (改行を含む長文)
+        """
+        if not user_request:
+            return False
+        if len(user_request) > cls._SIMPLE_MAX_INPUT_LEN:
+            return False
+        # 改行ありは複雑な要求とみなす
+        if "\n" in user_request and len(user_request.strip().splitlines()) >= 2:
+            return False
+        # 番号付きリスト (1. 2. or 1) 2)) 検出
+        import re
+        if re.search(r"\b[1-9][.)]\s", user_request):
+            return False
+        # 禁止キーワード検出 (大文字小文字無視)
+        ur_lower = user_request.lower()
+        for kw in cls._SIMPLE_FORBIDDEN_KEYWORDS:
+            if kw.lower() in ur_lower:
+                return False
+        return True
+
+    @classmethod
+    def _detect_simple_shortcut(cls, text: str, user_request: str = "") -> str | None:
         """
         Thinker の応答が早期終了マーカー "SIMPLE:" で始まるか検査する。
         該当した場合は SIMPLE: を取り除いた本文を返し、それ以外は None。
 
         判定はゆるく、先頭から最大80文字以内に "SIMPLE:" が出現すれば成立。
         モデルが余分な前置き ("以下が応答です:" 等) を付ける場合への保険。
+
+        ただし user_request が SIMPLE 適格でない (50字超 / コード生成キーワード /
+        複数項目) 場合は Thinker の判定を破棄して None を返す (= 通常分解へ)。
         """
         if not text:
+            return None
+        # 入力ガード: そもそも user_request が SIMPLE 対象外なら早期終了は許可しない
+        if user_request and not cls._is_simple_eligible(user_request):
             return None
         # 先頭の <think>...</think> ブロック (deepseek-r1 系) は除去
         body = text
@@ -273,7 +318,7 @@ class HeraCrew:
                 # ── 早期終了 (short-circuit) 判定 ─────────────────────────
                 # Thinker が "SIMPLE:" で応答した場合、Step2-4 をスキップして
                 # 直接 final_result とする。挨拶・自明な質問などへの高速応答用。
-                early = self._detect_simple_shortcut(decomposition_result)
+                early = self._detect_simple_shortcut(decomposition_result, user_request=user_request)
                 if early is not None:
                     err.print(
                         "[bold green]Early termination[/]: Thinker classified the request as SIMPLE. "
