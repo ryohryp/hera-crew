@@ -120,10 +120,18 @@ class UsageTracker:
         self._litellm_callbacks_registered: bool = False
         # Step1の早期終了 (SIMPLE shortcut) フラグ
         self._early_termination: bool = False
+        # 各Stepの本文 (decomposition / evaluation / execution / verification) を保持
+        # 別ファイル reports/step_outputs_<ts>.json に保存 (history.jsonl は短く保つ)
+        self._step_contents: dict[str, str] = {}
 
     def mark_early_termination(self) -> None:
         """Thinkerが単純タスクと判定し、Step2-4をスキップしたことを記録"""
         self._early_termination = True
+
+    def record_step_content(self, step_name: str, content: str) -> None:
+        """各Stepの本文を保持。後で reports/step_outputs_<ts>.json に保存される。"""
+        if content:
+            self._step_contents[step_name] = content
 
     def register_litellm(self, model_name: str = "") -> None:
         # 1回目だけ run_start と _model_name (代表値) を設定
@@ -694,6 +702,18 @@ class UsageTracker:
         elapsed = time.time() - self._run_start
 
         self._append_history(ts, elapsed, output_dir)
+        # 各Stepの本文を別ファイルに保存 (Step4が壊れても他Stepの内容を救出可能にする)
+        if self._step_contents:
+            step_path = output_dir / f"step_outputs_{ts}.json"
+            payload = {
+                "ts": ts,
+                "task": self._task,
+                "models": list(self._registered_models),
+                "early_termination": self._early_termination,
+                "step_contents": self._step_contents,
+                "step_elapsed": {k: round(v, 1) for k, v in self._step_elapsed.items()},
+            }
+            step_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
         history = self._load_history(output_dir)
 
         path = output_dir / "hera_report.html"
