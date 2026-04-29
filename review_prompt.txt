@@ -1,3 +1,23 @@
+hera-crew 自身の crew.py コードをシニアエンジニア視点でレビューしてください。
+これは自己参照的なメタタスクです。HERA パイプラインを実装した本体ファイルなので、率直で実用的な指摘をしてください。
+
+【レビュー観点】
+1. 設計・構造: クラス分離の妥当性、責務の明確さ、命名
+2. 保守性: 重複ロジック、関数の長さ、テスタビリティ
+3. パフォーマンス: 不要処理、重複初期化、最適化余地
+4. 堅牢性: 例外処理、リソース管理 (AgentSession, Live)、エッジケース
+5. 早期終了ガード: _is_simple_eligible のロジックの抜け穴
+
+【出力形式】
+上位3〜5個に絞ってください。各提案に以下を明記:
+- 該当箇所 (行番号 or 関数名)
+- 問題の具体的内容
+- 改善案 (コードスニペット示せれば理想)
+- 影響度 (HIGH / MEDIUM / LOW)
+
+最後に「全体所感」を3〜5行で総括してください。LGTM 系の褒め言葉は不要。
+
+【レビュー対象コード】
 import os
 import yaml
 import asyncio
@@ -24,9 +44,8 @@ class HeraUI:
     ]
 
     def __init__(self, model_name: str | dict):
-        # model_name は単一の文字列 (後方互換) または
-        # {"thinker": "...", "critic": "...", "manager": "..."} の辞書を受け取る
-        self.model_name = model_name
+        # model_name 縺ｯ蜊倅ｸ縺ｮ譁・ｭ怜・ (蠕梧婿莠呈鋤) 縺ｾ縺溘・
+        # {"thinker": "...", "critic": "...", "manager": "..."} 縺ｮ霎樊嶌繧貞女縺大叙繧・        self.model_name = model_name
         self._status: dict[int, str] = {n: "pending" for n, _, _ in self._STEPS}
         self._start_at: dict[int, float] = {}
         self._elapsed: dict[int, float] = {}
@@ -45,20 +64,20 @@ class HeraUI:
         for num, task_name, agent_name in self._STEPS:
             s = self._status[num]
             if s == "pending":
-                icon, style, t = "⬜", "dim", "-"
+                icon, style, t = "筮・, "dim", "-"
             elif s == "running":
                 elapsed = time.time() - self._start_at.get(num, time.time())
-                icon, style, t = "⏳", "bold yellow", f"{elapsed:.1f}s"
+                icon, style, t = "竢ｳ", "bold yellow", f"{elapsed:.1f}s"
             elif s == "failed":
-                icon, style, t = "❌", "bold red", f"{self._elapsed.get(num, 0):.1f}s"
+                icon, style, t = "笶・, "bold red", f"{self._elapsed.get(num, 0):.1f}s"
             elif s == "skipped":
-                icon, style, t = "⏭", "dim cyan", "—"
+                icon, style, t = "竢ｭ", "dim cyan", "窶・
             else:
-                icon, style, t = "✅", "green", f"{self._elapsed.get(num, 0):.1f}s"
+                icon, style, t = "笨・, "green", f"{self._elapsed.get(num, 0):.1f}s"
             table.add_row(icon, task_name, agent_name, t, style=style)
 
         title = (
-            f"[bold cyan]🤖 {self._current_agent}[/] [dim]│[/] [cyan]{self._current_task}[/]"
+            f"[bold cyan]､・{self._current_agent}[/] [dim]笏・/] [cyan]{self._current_task}[/]"
             if self._current_agent else "[dim]Output[/]"
         )
         output_text = self._output[-2000:] if self._output else "[dim]Waiting...[/dim]"
@@ -76,7 +95,7 @@ class HeraUI:
         return Group(
             Panel(
                 model_label,
-                title="[bold magenta]🤖 HERA Multi-Agent System[/]",
+                title="[bold magenta]､・HERA Multi-Agent System[/]",
                 border_style="magenta",
             ),
             table,
@@ -101,7 +120,7 @@ class HeraUI:
             self._live.update(self)
 
     def skip_step(self, step_num: int):
-        """早期終了でスキップされたステップを「失敗ではなくスキップ」として記録する"""
+        """譌ｩ譛溽ｵゆｺ・〒繧ｹ繧ｭ繝・・縺輔ｌ縺溘せ繝・ャ繝励ｒ縲悟､ｱ謨励〒縺ｯ縺ｪ縺上せ繧ｭ繝・・縲阪→縺励※險倬鹸縺吶ｋ"""
         self._status[step_num] = "skipped"
         if self._live:
             self._live.update(self)
@@ -136,17 +155,15 @@ class HeraCrew:
         self.config_path = Path(__file__).parent / "config"
         self.tasks_config = self._load_yaml("tasks.yaml")
 
-        # 3役分離: Thinker / Critic / Manager それぞれに別モデルを割り当てる
-        # 環境変数 (THINKER_MODEL / CRITIC_MODEL / MANAGER_MODEL) で個別に上書き可能
+        # 3蠖ｹ蛻・屬: Thinker / Critic / Manager 縺昴ｌ縺槭ｌ縺ｫ蛻･繝｢繝・Ν繧貞牡繧雁ｽ薙※繧・        # 迺ｰ蠅・､画焚 (THINKER_MODEL / CRITIC_MODEL / MANAGER_MODEL) 縺ｧ蛟句挨縺ｫ荳頑嶌縺榊庄閭ｽ
         self.role_cfgs: dict[str, dict] = LLMFactory.get_group_llms("hera")
         self.thinker_cfg = self.role_cfgs["thinker"]
         self.critic_cfg = self.role_cfgs["critic"]
         self.manager_cfg = self.role_cfgs["manager"]
 
-        # 後方互換のため model_cfg は manager を指す
-        self.model_cfg = self.manager_cfg
+        # 蠕梧婿莠呈鋤縺ｮ縺溘ａ model_cfg 縺ｯ manager 繧呈欠縺・        self.model_cfg = self.manager_cfg
 
-        # provider のタイムアウトは3役の最大値を採用
+        # provider 縺ｮ繧ｿ繧､繝繧｢繧ｦ繝医・3蠖ｹ縺ｮ譛螟ｧ蛟､繧呈治逕ｨ
         max_timeout = max(
             self.thinker_cfg.get("timeout", 1200),
             self.critic_cfg.get("timeout", 1200),
@@ -157,39 +174,34 @@ class HeraCrew:
         self.shared_system_prompt = self._create_unified_prompt()
         self.tracker = UsageTracker()
 
-    # 早期終了 (SIMPLE shortcut) を弾くキーワード。
-    # ユーザーリクエストにこれらが含まれていたら、Thinker が SIMPLE: で
-    # 返してきても無視して通常分解パスへ進む。
-    _SIMPLE_FORBIDDEN_KEYWORDS = (
-        "実装", "作成", "書いて", "書く", "ファイル", "コード", "スクリプト",
-        "API", "api", "クラス", "関数", "テスト", "test", "メソッド",
-        "リファクタ", "refactor", "デバッグ", "debug", "fix", "修正",
-        "ディレクトリ", "directory", "プロジェクト", "project",
+    # 譌ｩ譛溽ｵゆｺ・(SIMPLE shortcut) 繧貞ｼｾ縺上く繝ｼ繝ｯ繝ｼ繝峨・    # 繝ｦ繝ｼ繧ｶ繝ｼ繝ｪ繧ｯ繧ｨ繧ｹ繝医↓縺薙ｌ繧峨′蜷ｫ縺ｾ繧後※縺・◆繧峨ゝhinker 縺・SIMPLE: 縺ｧ
+    # 霑斐＠縺ｦ縺阪※繧ら┌隕悶＠縺ｦ騾壼ｸｸ蛻・ｧ｣繝代せ縺ｸ騾ｲ繧縲・    _SIMPLE_FORBIDDEN_KEYWORDS = (
+        "螳溯｣・, "菴懈・", "譖ｸ縺・※", "譖ｸ縺・, "繝輔ぃ繧､繝ｫ", "繧ｳ繝ｼ繝・, "繧ｹ繧ｯ繝ｪ繝励ヨ",
+        "API", "api", "繧ｯ繝ｩ繧ｹ", "髢｢謨ｰ", "繝・せ繝・, "test", "繝｡繧ｽ繝・ラ",
+        "繝ｪ繝輔ぃ繧ｯ繧ｿ", "refactor", "繝・ヰ繝・げ", "debug", "fix", "菫ｮ豁｣",
+        "繝・ぅ繝ｬ繧ｯ繝医Μ", "directory", "繝励Ο繧ｸ繧ｧ繧ｯ繝・, "project",
     )
-    _SIMPLE_MAX_INPUT_LEN = 50  # ユーザーリクエストがこれを超えたら早期終了禁止
+    _SIMPLE_MAX_INPUT_LEN = 50  # 繝ｦ繝ｼ繧ｶ繝ｼ繝ｪ繧ｯ繧ｨ繧ｹ繝医′縺薙ｌ繧定ｶ・∴縺溘ｉ譌ｩ譛溽ｵゆｺ・ｦ∵ｭ｢
 
     @classmethod
     def _is_simple_eligible(cls, user_request: str) -> bool:
         """
-        ユーザーリクエストが早期終了 (SIMPLE shortcut) の対象になり得るか判定。
-        以下のいずれかに該当する場合は False (= SIMPLE 禁止):
-          - 50文字超
-          - コード生成系キーワードを含む
-          - 番号付きリスト (1. 2.) などの複数項目構造を含む
-          - 複数行構造 (改行を含む長文)
+        繝ｦ繝ｼ繧ｶ繝ｼ繝ｪ繧ｯ繧ｨ繧ｹ繝医′譌ｩ譛溽ｵゆｺ・(SIMPLE shortcut) 縺ｮ蟇ｾ雎｡縺ｫ縺ｪ繧雁ｾ励ｋ縺句愛螳壹・        莉･荳九・縺・★繧後°縺ｫ隧ｲ蠖薙☆繧句ｴ蜷医・ False (= SIMPLE 遖∵ｭ｢):
+          - 50譁・ｭ苓ｶ・          - 繧ｳ繝ｼ繝臥函謌千ｳｻ繧ｭ繝ｼ繝ｯ繝ｼ繝峨ｒ蜷ｫ繧
+          - 逡ｪ蜿ｷ莉倥″繝ｪ繧ｹ繝・(1. 2.) 縺ｪ縺ｩ縺ｮ隍・焚鬆・岼讒矩繧貞性繧
+          - 隍・焚陦梧ｧ矩 (謾ｹ陦後ｒ蜷ｫ繧髟ｷ譁・
         """
         if not user_request:
             return False
         if len(user_request) > cls._SIMPLE_MAX_INPUT_LEN:
             return False
-        # 改行ありは複雑な要求とみなす
-        if "\n" in user_request and len(user_request.strip().splitlines()) >= 2:
+        # 謾ｹ陦後≠繧翫・隍・尅縺ｪ隕∵ｱゅ→縺ｿ縺ｪ縺・        if "\n" in user_request and len(user_request.strip().splitlines()) >= 2:
             return False
-        # 番号付きリスト (1. 2. or 1) 2)) 検出
+        # 逡ｪ蜿ｷ莉倥″繝ｪ繧ｹ繝・(1. 2. or 1) 2)) 讀懷・
         import re
         if re.search(r"\b[1-9][.)]\s", user_request):
             return False
-        # 禁止キーワード検出 (大文字小文字無視)
+        # 遖∵ｭ｢繧ｭ繝ｼ繝ｯ繝ｼ繝画､懷・ (螟ｧ譁・ｭ怜ｰ乗枚蟄礼┌隕・
         ur_lower = user_request.lower()
         for kw in cls._SIMPLE_FORBIDDEN_KEYWORDS:
             if kw.lower() in ur_lower:
@@ -199,21 +211,15 @@ class HeraCrew:
     @classmethod
     def _detect_simple_shortcut(cls, text: str, user_request: str = "") -> str | None:
         """
-        Thinker の応答が早期終了マーカー "SIMPLE:" で始まるか検査する。
-        該当した場合は SIMPLE: を取り除いた本文を返し、それ以外は None。
-
-        判定はゆるく、先頭から最大80文字以内に "SIMPLE:" が出現すれば成立。
-        モデルが余分な前置き ("以下が応答です:" 等) を付ける場合への保険。
-
-        ただし user_request が SIMPLE 適格でない (50字超 / コード生成キーワード /
-        複数項目) 場合は Thinker の判定を破棄して None を返す (= 通常分解へ)。
-        """
+        Thinker 縺ｮ蠢懃ｭ斐′譌ｩ譛溽ｵゆｺ・・繝ｼ繧ｫ繝ｼ "SIMPLE:" 縺ｧ蟋九∪繧九°讀懈渊縺吶ｋ縲・        隧ｲ蠖薙＠縺溷ｴ蜷医・ SIMPLE: 繧貞叙繧企勁縺・◆譛ｬ譁・ｒ霑斐＠縲√◎繧御ｻ･螟悶・ None縲・
+        蛻､螳壹・繧・ｋ縺上∝・鬆ｭ縺九ｉ譛螟ｧ80譁・ｭ嶺ｻ･蜀・↓ "SIMPLE:" 縺悟・迴ｾ縺吶ｌ縺ｰ謌千ｫ九・        繝｢繝・Ν縺御ｽ吝・縺ｪ蜑咲ｽｮ縺・("莉･荳九′蠢懃ｭ斐〒縺・" 遲・ 繧剃ｻ倥￠繧句ｴ蜷医∈縺ｮ菫晞匱縲・
+        縺溘□縺・user_request 縺・SIMPLE 驕ｩ譬ｼ縺ｧ縺ｪ縺・(50蟄苓ｶ・/ 繧ｳ繝ｼ繝臥函謌舌く繝ｼ繝ｯ繝ｼ繝・/
+        隍・焚鬆・岼) 蝣ｴ蜷医・ Thinker 縺ｮ蛻､螳壹ｒ遐ｴ譽・＠縺ｦ None 繧定ｿ斐☆ (= 騾壼ｸｸ蛻・ｧ｣縺ｸ)縲・        """
         if not text:
             return None
-        # 入力ガード: そもそも user_request が SIMPLE 対象外なら早期終了は許可しない
-        if user_request and not cls._is_simple_eligible(user_request):
+        # 蜈･蜉帙ぎ繝ｼ繝・ 縺昴ｂ縺昴ｂ user_request 縺・SIMPLE 蟇ｾ雎｡螟悶↑繧画掠譛溽ｵゆｺ・・險ｱ蜿ｯ縺励↑縺・        if user_request and not cls._is_simple_eligible(user_request):
             return None
-        # 先頭の <think>...</think> ブロック (deepseek-r1 系) は除去
+        # 蜈磯ｭ縺ｮ <think>...</think> 繝悶Ο繝・け (deepseek-r1 邉ｻ) 縺ｯ髯､蜴ｻ
         body = text
         if body.lstrip().startswith("<think>"):
             end = body.find("</think>")
@@ -224,13 +230,12 @@ class HeraCrew:
         idx = head.find("SIMPLE:")
         if idx < 0:
             return None
-        # SIMPLE: マーカー以降を取り出す
-        marker_end = body.upper().find("SIMPLE:") + len("SIMPLE:")
+        # SIMPLE: 繝槭・繧ｫ繝ｼ莉･髯阪ｒ蜿悶ｊ蜃ｺ縺・        marker_end = body.upper().find("SIMPLE:") + len("SIMPLE:")
         answer = body[marker_end:].strip()
         return answer if answer else None
 
     async def _new_session(self, model: str) -> AgentSession:
-        """Step毎に切り替える AgentSession を生成する。"""
+        """Step豈弱↓蛻・ｊ譖ｿ縺医ｋ AgentSession 繧堤函謌舌☆繧九・""
         session = AgentSession(
             model=model,
             provider=self.provider,
@@ -273,7 +278,7 @@ class HeraCrew:
         orchestrator_output_tokens: int = 0,
         orchestrator_model: str = "",
     ):
-        # tracker には3役全モデルを登録 (使用量レポートに全モデル分が出るように)
+        # tracker 縺ｫ縺ｯ3蠖ｹ蜈ｨ繝｢繝・Ν繧堤匳骭ｲ (菴ｿ逕ｨ驥上Ξ繝昴・繝医↓蜈ｨ繝｢繝・Ν蛻・′蜃ｺ繧九ｈ縺・↓)
         for cfg in (self.thinker_cfg, self.critic_cfg, self.manager_cfg):
             self.tracker.register_litellm(cfg["model"])
         self.tracker.set_task(user_request)
@@ -316,10 +321,9 @@ class HeraCrew:
                     ui.fail_step(1, str(e))
                     raise
 
-                # ── 早期終了 (short-circuit) 判定 ─────────────────────────
-                # Thinker が "SIMPLE:" で応答した場合、Step2-4 をスキップして
-                # 直接 final_result とする。挨拶・自明な質問などへの高速応答用。
-                early = self._detect_simple_shortcut(decomposition_result, user_request=user_request)
+                # 笏笏 譌ｩ譛溽ｵゆｺ・(short-circuit) 蛻､螳・笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏
+                # Thinker 縺・"SIMPLE:" 縺ｧ蠢懃ｭ斐＠縺溷ｴ蜷医ヾtep2-4 繧偵せ繧ｭ繝・・縺励※
+                # 逶ｴ謗･ final_result 縺ｨ縺吶ｋ縲よ肩諡ｶ繝ｻ閾ｪ譏弱↑雉ｪ蝠上↑縺ｩ縺ｸ縺ｮ鬮倬溷ｿ懃ｭ皮畑縲・                early = self._detect_simple_shortcut(decomposition_result, user_request=user_request)
                 if early is not None:
                     err.print(
                         "[bold green]Early termination[/]: Thinker classified the request as SIMPLE. "
@@ -327,7 +331,7 @@ class HeraCrew:
                     )
                     self.tracker.mark_early_termination()
                     self.tracker.record_step_content("Final Verification", early)
-                    # 残りステップをUI上ではスキップ表示にする
+                    # 谿九ｊ繧ｹ繝・ャ繝励ｒUI荳翫〒縺ｯ繧ｹ繧ｭ繝・・陦ｨ遉ｺ縺ｫ縺吶ｋ
                     for n in (2, 3, 4):
                         ui.skip_step(n)
                     final_result = early
@@ -400,7 +404,7 @@ class HeraCrew:
                     raise
 
                 # Step 4: Final Verification (Manager)
-                # Step3 の manager_session を再利用してOllama側のモデル再ロードを避ける
+                # Step3 縺ｮ manager_session 繧貞・蛻ｩ逕ｨ縺励※Ollama蛛ｴ縺ｮ繝｢繝・Ν蜀阪Ο繝ｼ繝峨ｒ驕ｿ縺代ｋ
                 ui.start_step(4)
                 self.tracker.set_step("Final Verification")
                 err.print(f"[dim]Calling {self.manager_cfg['model']} for Final Verification...[/]")
@@ -430,8 +434,8 @@ class HeraCrew:
                 report_path = self.tracker.save_html()
                 err = Console(stderr=True)
                 err.print(self.tracker.render_savings_panel())
-                err.print(f"[dim]レポート保存 → [cyan]{report_path}[/][/]")
+                err.print(f"[dim]繝ｬ繝昴・繝井ｿ晏ｭ・竊・[cyan]{report_path}[/][/]")
             except Exception as e:
-                Console(stderr=True).print(f"[yellow]レポート生成失敗: {e}[/]")
+                Console(stderr=True).print(f"[yellow]繝ｬ繝昴・繝育函謌仙､ｱ謨・ {e}[/]")
 
         return final_result

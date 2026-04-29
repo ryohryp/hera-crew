@@ -1,7 +1,7 @@
 import sys
 import os
 
-# Force UTF-8 for stdout/stderr to prevent encoding errors on Windows (cp932)
+# Force UTF-8 for stdout/stderr to prevent encoding errors on Windows
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 if hasattr(sys.stderr, "reconfigure"):
@@ -15,7 +15,7 @@ if src_path not in sys.path:
 
 from hera_crew.crew import HeraCrew
 
-# Environmental overrides for testing
+# Environmental overrides for testing (Local Ollama)
 os.environ["OPENAI_API_KEY"] = "NA"
 os.environ["OPENAI_API_BASE"] = "http://localhost:11434/v1"
 os.environ["OLLAMA_HOST"] = "http://localhost:11434"
@@ -23,10 +23,12 @@ os.environ["OLLAMA_HOST"] = "http://localhost:11434"
 import asyncio
 
 def test_run():
-    user_request = "宇宙物理学に基づき、一般相対性理論を考慮した人工衛星の軌道シミュレータを実装せよ。数値積分にはRunge-Kutta法を使用し、PyTorchでの高速化も検討すること。"
+    # Simple "Hello" level prompt for basic testing
+    user_request = "Hello"
     
     print(f"Testing with request: {user_request}")
     try:
+        # Note: HeraCrew().run() is an async method
         result = asyncio.run(HeraCrew().run(user_request))
         print("\n\n########################")
         print("## TEST RESULT ##")

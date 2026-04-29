@@ -1,4 +1,10 @@
 {
+  "mcpServers": {
+    "hera-crew": {
+      "command": "i:/04_develop/hera-crew/venv/Scripts/python.exe",
+      "args": ["i:/04_develop/hera-crew/mcp_crew_server.py"]
+    }
+  },
   "permissions": {
     "allow": [
       "Read(//c/Users/ryo/.claude/**)",
@@ -6,7 +12,8 @@
       "Read(//c/Users/ryo/AppData/Local/Packages/Claude_pzs8sxrjxfjjc/LocalCache/Roaming/Claude/**)",
       "Read(//c/Users/ryo/AppData/**)",
       "Bash(xargs grep:*)",
-      "Bash(find C:/Users/ryo/AppData/Roaming/Antigravity/ -name *.json)"
+      "Bash(find C:/Users/ryo/AppData/Roaming/Antigravity/ -name *.json)",
+      "mcp__hera-crew__delegate_task(*)"
     ]
   }
 }

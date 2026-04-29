@@ -1,15 +1,15 @@
 # HERA: Hybrid Edge-cloud Resource Allocation
 
 ![HERA Banner](https://img.shields.io/badge/Strategy-HERA-blueviolet?style=for-the-badge)
-![CrewAI](https://img.shields.io/badge/Framework-CrewAI-red?style=for-the-badge)
+![agentcache](https://img.shields.io/badge/Framework-agentcache-blue?style=for-the-badge)
 ![Ollama](https://img.shields.io/badge/Local_LLM-Ollama-orange?style=for-the-badge)
 ![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)
 
 > [日本語版はこちら](README_ja.md)
 
-A local-first, multi-agent AI system built on [CrewAI](https://github.com/crewAIInc/crewAI) and [Ollama](https://ollama.com/).
-Run powerful 14B-class models entirely on your own GPU — no cloud API required.
-When you need it, plug in Gemini or any other cloud LLM with a single `.env` change.
+A local-first, multi-agent AI system built on [agentcache](https://github.com/eyurtsev/agentcache) and [Ollama](https://ollama.com/).
+Run powerful models entirely on your own GPU — no cloud API required.
+When you need it, plug in any cloud LLM with a single `.env` change.
 
 ---
 
@@ -17,9 +17,10 @@ When you need it, plug in Gemini or any other cloud LLM with a single `.env` cha
 
 Most AI workflows default to cloud APIs for every call. HERA flips that default:
 
-- **Thinker** (Gemma 3) — decomposes tasks and writes first drafts locally
-- **Critic** (Phi-4) — reviews and catches hallucinations locally
-- **Manager** (Qwen2.5 14B) — orchestrates, validates, and escalates to cloud only when needed
+- **Thinker** — decomposes tasks and writes first drafts locally
+- **Critic** — reviews and catches logical errors locally
+- **Manager** — executes and routes, escalating to cloud only when needed
+- **Verifier** — confirms the final result matches the original request
 
 The result: the expensive cloud token budget is spent only on work that actually needs it.
 
@@ -27,7 +28,7 @@ The result: the expensive cloud token budget is spent only on work that actually
 |---|---|
 | API cost | Iterative thinking stays local |
 | Privacy | Drafts never leave your machine |
-| Quality | 3-agent cross-review catches errors |
+| Quality | 4-stage cross-review catches errors |
 | Flexibility | Swap any model in one line of `.env` |
 
 ---
@@ -35,9 +36,11 @@ The result: the expensive cloud token budget is spent only on work that actually
 ## Key Features
 
 - **HERA resource strategy** — dynamic local/cloud routing per task
+- **4-stage pipeline** — Thinker → Critic → Manager → Verifier with real-time terminal UI
 - **MCP server mode** — expose the crew as a tool to Claude Desktop, Cursor, etc.
 - **Centralized LLM config** — one `llms.yaml` controls every model; `.env` overrides per-run
-- **32k context window** — `num_ctx: 32768` applied to all Ollama calls via `extra_body`
+- **Usage tracking & HTML report** — full cost comparison (local vs. cloud) saved to `reports/hera_report.html`
+- **32k context window** — `num_ctx: 32768` applied to all Ollama calls
 - **Zero OpenAI dependency** — fully offline by default; no `OPENAI_API_KEY` required
 
 ---
@@ -47,25 +50,27 @@ The result: the expensive cloud token budget is spent only on work that actually
 ```mermaid
 graph TD
     subgraph "Cloud (optional)"
-        A[Cloud LLM e.g. Gemini]
+        A[Cloud LLM e.g. Gemini / Claude]
     end
 
     subgraph "Local PC"
         B[MCP Server<br/>mcp_crew_server.py]
-        C[CrewAI Orchestrator]
+        C[agentcache AgentSession]
 
-        subgraph "Ollama 14B models"
-            D[Thinker: Gemma 3]
-            E[Critic: Phi-4]
-            F[Manager: Qwen2.5 14B]
+        subgraph "Ollama (single model, 4 roles)"
+            D[Step 1: Thinker — Task Decomposition]
+            E[Step 2: Critic — Logic Evaluation]
+            F[Step 3: Manager — Execution & Routing]
+            G[Step 4: Verifier — Final Verification]
         end
+
+        H[UsageTracker → reports/hera_report.html]
     end
 
-    A <-->|MCP| B
-    B <--> C
-    C --> D
-    C --> E
-    C --> F
+    A <-->|MCP delegate_task| B
+    B --> C
+    C --> D --> E --> F --> G
+    G --> H
 ```
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for details.
@@ -80,6 +85,9 @@ hera-crew/
 ├── mcp_settings_example.json   # MCP client config example
 ├── mcp_crew_server.py          # MCP server entry point
 ├── requirements.txt
+├── reports/
+│   ├── hera_report.html        # HTML cost report (overwritten each run)
+│   └── history.jsonl           # Run history
 ├── scripts/
 │   └── inspect_llm.py
 ├── tests/
@@ -92,17 +100,22 @@ hera-crew/
     │   └── tasks.yaml          # Task routing definitions
     ├── tools/
     │   └── antigravity_delegate.py
-    ├── crew.py
-    └── main.py
+    ├── utils/
+    │   ├── env_setup.py        # Environment initialization
+    │   ├── llm_factory.py      # LLM config builder
+    │   └── usage_tracker.py    # Token usage & cost tracking
+    ├── crew.py                 # HeraCrew — 4-stage pipeline + HeraUI
+    ├── main.py                 # Standalone CLI entry point
+    └── orbital_simulator.py    # Example: GR-corrected orbit simulator (RK4 + PyTorch)
 ```
 
 ---
 
 ## Requirements
 
-- Python 3.10 – 3.13
+- Python 3.10–3.13
 - [Ollama](https://ollama.com/) installed and running
-- GPU recommended (VRAM 16 GB+ for all 14B models simultaneously)
+- GPU recommended (VRAM 8 GB+ for a 14B model)
 
 ---
 
@@ -121,17 +134,11 @@ cp .env.example .env
 # Edit .env if needed
 ```
 
-Pull the required Ollama models:
+Pull the required Ollama model:
 
 ```bash
-# HERA crew (main.py)
-ollama pull qwen2.5:14b         # Manager — must support function calling
-ollama pull gemma3:latest       # Thinker
-ollama pull phi4:latest         # Critic
-
-# MCP server (mcp_crew_server.py)
-ollama pull qwen2.5-coder:14b   # Specialist / Coder
-ollama pull deepseek-r1:14b     # Reviewer
+# Main pipeline model (must support function calling)
+ollama pull qwen2.5:14b
 ```
 
 ---
@@ -144,8 +151,8 @@ ollama pull deepseek-r1:14b     # Reviewer
 python src/hera_crew/main.py
 ```
 
-Enter your task at the prompt. The crew runs sequentially:
-Thinker → Critic → Manager → final output.
+Enter your task at the prompt. The crew runs the 4-stage pipeline with a real-time Rich terminal UI:
+Thinker → Critic → Manager → Verifier → HTML report saved to `reports/hera_report.html`.
 
 ### MCP Server
 
@@ -166,7 +173,22 @@ Add to your MCP client config (e.g. Claude Desktop `claude_desktop_config.json`)
 }
 ```
 
-This exposes a `delegate_task(task_description)` tool that offloads complex work to your local agent team.
+This exposes a `delegate_task` tool. The orchestrating LLM (e.g. Claude) calls it like this:
+
+```
+delegate_task(
+    task_description="<full task with file paths, goals, constraints>",
+    orchestrator_input_tokens=<input tokens so far>,
+    orchestrator_output_tokens=<output tokens so far>,
+    orchestrator_model="claude-sonnet-4-6"
+)
+```
+
+Passing token counts lets HERA render a full local-vs-cloud cost comparison in the HTML report.
+
+> **Note for Claude Code users:** Claude Code cannot expose its own token counts to MCP tools.
+> Leave `orchestrator_input_tokens` / `orchestrator_output_tokens` unset (default 0).
+> The report will show time-based pipeline metrics instead of cost comparison.
 
 ### Quick test
 
@@ -178,42 +200,27 @@ python tests/test_delegation.py
 
 ## Example Execution
 
-HERA demonstrates sophisticated reasoning in Japanese, even when running entirely on local 14B models.
+HERA demonstrates sophisticated reasoning in Japanese, even when running entirely on local models.
 
 **Request:**
 > Implement a satellite orbit simulator based on astrophysics, considering general relativity. Use the Runge-Kutta method for numerical integration and consider acceleration with PyTorch.
 
-**Execution Trace (Summary):**
+**Real-time terminal UI (HeraUI):**
 
-```text
-╭──────────────────────────────────────────────────── 🤖 Agent Started ────────────────────────────────────────────────────╮
-│  Agent: Bridge Thinker (Gemma 3)                                                                                         │
-│  Task: Decompose the request into detailed subtasks (Manifests) in Japanese.                                             │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
-
-╭───────────────────────────────────────────────── ✅ Agent Final Answer ──────────────────────────────────────────────────╮
-│  Final Answer: (Decomposition example in Japanese)                                                                       │
-│  1. Define basic physical models (constants.py): G, c, earth_mass, etc.                                                  │
-│  2. Relativistic formula implementation (gravity_potential.py): Schwarzschild potential.                                  │
-│  3. RK4 Implementation (rk4.py): 4th-order Runge-Kutta motion integrator.                                                │
-│  ... (omitted)                                                                                                           │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
-
-╭──────────────────────────────────────────────────── 🤖 Agent Started ────────────────────────────────────────────────────╮
-│  Agent: The Quality Critic (Phi-4)                                                                                       │
-│  Task: Evaluate if subtasks are solvable locally or require Cloud escalation (Antigravity).                              │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
-
-╭───────────────────────────────────────────────── ✅ Agent Final Answer ──────────────────────────────────────────────────╮
-│  Final Answer:                                                                                                           │
-│  - Subtasks 1, 4, 6: LOCAL (Safe for Gemma 3 to handle)                                                                  │
-│  - Subtasks 2, 3, 5: FALLBACK (Recommended delegation due to complex physics/RK4 requirements)                            │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+```
+╭─────────────── 🤖 HERA Multi-Agent System ───────────────╮
+│ Model: ollama/qwen2.5:14b                                 │
+├───┬──────────────────────┬─────────┬───────────────────────┤
+│   │ Task                 │ Agent   │ Time                  │
+├───┼──────────────────────┼─────────┼───────────────────────┤
+│ ✅│ Task Decomposition   │ Thinker │ 12.3s                 │
+│ ✅│ Logic Evaluation     │ Critic  │ 8.7s                  │
+│ ✅│ Execution & Routing  │ Manager │ 45.2s                 │
+│ ⏳│ Final Verification   │ Manager │ 6.1s                  │
+╰───┴──────────────────────┴─────────┴───────────────────────╯
 ```
 
-HERA doesn't just generate answers; it **critically assesses its own capabilities** and routes tasks to the most appropriate resource (Local Edge vs. Cloud Expert).
-
-[See full log here](logs/sample_execution.log)
+HERA doesn't just generate answers; it **critically assesses its own capabilities** and routes tasks to the most appropriate resource (local edge vs. cloud).
 
 ---
 
@@ -227,18 +234,12 @@ hera:
     model: "ollama/qwen2.5:14b"   # ollama/ prefix required
     timeout: 300
     num_ctx: 32768
-  thinker:
-    model: "ollama/gemma3:latest"
-  critic:
-    model: "ollama/phi4:latest"
 ```
 
 ### Override per-run via `.env`
 
 ```ini
 MANAGER_MODEL=ollama/qwen2.5:14b
-THINKER_MODEL=ollama/gemma3:latest
-CRITIC_MODEL=ollama/phi4:latest
 
 # Switch to cloud:
 # MANAGER_MODEL=gemini/gemini-1.5-pro
@@ -250,10 +251,21 @@ CRITIC_MODEL=ollama/phi4:latest
 
 ---
 
+## Usage Report
+
+After each run, an HTML report is saved to `reports/hera_report.html`. It shows:
+
+- Tokens and cost per pipeline step
+- Total local cost vs. equivalent cloud cost
+- Delegation count (calls to the cloud via `antigravity_delegate`)
+- Run history across sessions (`reports/history.jsonl`)
+
+---
+
 ## Troubleshooting
 
 **`Failed to connect to OpenAI API` (Connection error)**
-LiteLLM is trying to reach OpenAI for model cost data or validation. Ensure your `.env` has these three flags:
+LiteLLM is trying to reach OpenAI for model cost data. Ensure your `.env` has these flags:
 - `OPENAI_API_KEY=NA`
 - `LITELLM_LOCAL_MODEL_COST_MAP=True`
 - `LITELLM_DROP_PARAMS=True`
@@ -262,10 +274,10 @@ LiteLLM is trying to reach OpenAI for model cost data or validation. Ensure your
 Ensure `OPENAI_API_KEY=NA` is set in your `.env`.
 
 **`404 Model Not Found` error**
-Check your model names in `llms.yaml` or `.env`. They must exactly match the output of `ollama list` and must include the `ollama/` prefix.
+Check your model name in `llms.yaml` or `.env`. It must exactly match `ollama list` output and must include the `ollama/` prefix.
 
 **Model "forgets" in long conversations**
-Verify the `num_ctx` in `llms.yaml`. It is set to `32768` by default for all local models.
+Verify the `num_ctx` in `llms.yaml`. It is set to `32768` by default.
 
 ---
 

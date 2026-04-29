@@ -3,43 +3,53 @@
 default_ollama_base_url: "http://localhost:11434"
 
 # HERA Strategy Models (Used in crew.py)
+# 3役分離構成 (VRAM 16GB / RX 6800)
+# 各モデル単独で必ずVRAMに収まるサイズに統一 (CPUオフロード回避)
+# Ollama側でStep切替時にモデルswapが発生するが、各時点では1モデルのみVRAMに乗る
 hera:
   manager:
+    # Step3 Execution & Routing / Step4 Final Verification を担当
+    # 推論強化型 R1 系。論理判断と最終検証に向く (9GB)
     model: "ollama/deepseek-r1:14b"
-    timeout: 300
+    timeout: 1200
     num_ctx: 32768
   thinker:
-    model: "ollama/gemma3:latest"
-    timeout: 60
+    # Step1 Task Decomposition を担当
+    # コード/構造化指示の分解に強い qwen2.5-coder (9GB)
+    model: "ollama/qwen2.5-coder:14b"
+    timeout: 1200
     num_ctx: 32768
   critic:
-    model: "ollama/phi4:latest"
-    timeout: 90
-    num_ctx: 32768
+    # Step2 Logic Evaluation を担当
+    # 軽量汎用モデル。HERAのshared_system_promptと整合 (5.2GB)
+    # ※ the-critic:latest はカスタムSYSTEMがHERAのsystem_promptに上書きされるため不採用
+    model: "ollama/qwen3:8b"
+    timeout: 1200
+    num_ctx: 16384
   tool_calling:
     model: "ollama/qwen2.5:14b"
-    timeout: 60
+    timeout: 1200
     num_ctx: 8192
 
 # General Crew Models (Used in mcp_crew_server.py)
 general:
   analyst:
     model: "ollama/qwen2.5:14b"
-    timeout: 120
+    timeout: 1200
     num_ctx: 32768
   specialist:
     model: "ollama/qwen2.5-coder:14b"
-    timeout: 120
+    timeout: 1200
     num_ctx: 32768
   reviewer:
     model: "ollama/deepseek-r1:14b"
-    timeout: 300
+    timeout: 1200
     num_ctx: 32768
   planner:
     model: "ollama/qwen2.5:14b"
-    timeout: 120
+    timeout: 1200
     num_ctx: 32768
   coder:
     model: "ollama/qwen2.5-coder:14b"
-    timeout: 120
+    timeout: 1200
     num_ctx: 32768
