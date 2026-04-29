@@ -60,12 +60,34 @@ class LLMFactory:
             "num_ctx": num_ctx
         }
 
+    # Default env-var override map for the 'hera' group.
+    # 3役分離構成で各役のモデルを環境変数から差し替えられるようにする。
+    HERA_ENV_OVERRIDES = {
+        "manager": "MANAGER_MODEL",
+        "thinker": "THINKER_MODEL",
+        "critic": "CRITIC_MODEL",
+        "tool_calling": "TOOL_CALLING_MODEL",
+    }
+
     @classmethod
-    def get_group_llms(cls, group: str) -> dict:
-        """Helper to create all LLM configs in a specific group."""
+    def get_group_llms(cls, group: str, env_overrides: dict | None = None) -> dict:
+        """
+        Helper to create all LLM configs in a specific group.
+
+        Args:
+            group: Group name in llms.yaml (e.g. 'hera').
+            env_overrides: Optional mapping {role_name: ENV_VAR_NAME}. If group is
+                'hera' and this is omitted, HERA_ENV_OVERRIDES is used by default.
+        """
         config = cls._load_config()
         group_config = config.get(group, {})
-        return {name: cls.create_llm_config(group, name) for name in group_config.keys()}
+        if env_overrides is None and group == "hera":
+            env_overrides = cls.HERA_ENV_OVERRIDES
+        env_overrides = env_overrides or {}
+        return {
+            name: cls.create_llm_config(group, name, env_overrides.get(name))
+            for name in group_config.keys()
+        }
 
     @classmethod
     def create_crewai_llm(cls, group: str, name: str, env_override: str = None, **extra_config) -> LLM:
@@ -85,19 +107,22 @@ class LLMFactory:
             config=config_opts
         )
 
-# Radeon環境 (ROCm/Ollama) 向けのLLM定義例
-# モデル名やURLはllms.yamlや.envから動的に取得し、VRAM用のコンテキストサイズ制限などを上書きする
-local_worker_llm = LLMFactory.create_crewai_llm(
-    group='hera', 
-    name='thinker', 
-    env_override='THINKER_MODEL',
-    num_ctx=16384,
-    temperature=0.2
-)
+# Radeon環境 (ROCm/Ollama) 向けのLLM定義例 (CrewAI互換)
+# モジュール import 時に Ollama へ接続しないよう、必要な時に呼び出す関数として提供する
+def build_local_worker_llm() -> LLM:
+    return LLMFactory.create_crewai_llm(
+        group='hera',
+        name='thinker',
+        env_override='THINKER_MODEL',
+        num_ctx=16384,
+        temperature=0.2,
+    )
 
-local_critic_llm = LLMFactory.create_crewai_llm(
-    group='hera', 
-    name='critic', 
-    env_override='CRITIC_MODEL',
-    num_ctx=8192
-)
+
+def build_local_critic_llm() -> LLM:
+    return LLMFactory.create_crewai_llm(
+        group='hera',
+        name='critic',
+        env_override='CRITIC_MODEL',
+        num_ctx=8192,
+    )

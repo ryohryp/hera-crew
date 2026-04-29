@@ -3,19 +3,27 @@
 default_ollama_base_url: "http://localhost:11434"
 
 # HERA Strategy Models (Used in crew.py)
+# 3役分離構成 (VRAM 16GB / RX 6800 想定)
+# Ollama側でモデル切替時にswapが発生するため、num_ctxはVRAMに収まる範囲で設定
 hera:
   manager:
-    model: "ollama/deepseek-r1:14b"
+    # Step3 Execution & Routing / Step4 Final Verification を担当
+    # MoE (A3B) なのでアクティブパラメータは小さく、推論は軽い
+    model: "ollama/qwen3.6:35B-A3B"
     timeout: 1200
     num_ctx: 32768
   thinker:
-    model: "ollama/gemma4:26b"
+    # Step1 Task Decomposition を担当
+    # コーディング・構造化指示の分解に強いモデルを採用
+    model: "ollama/qwen2.5-coder:14b"
     timeout: 1200
     num_ctx: 32768
   critic:
-    model: "ollama/phi4:latest"
+    # Step2 Logic Evaluation を担当
+    # 軽量・高速で評価ループを回す
+    model: "ollama/qwen3:8b"
     timeout: 1200
-    num_ctx: 32768
+    num_ctx: 16384
   tool_calling:
     model: "ollama/qwen2.5:14b"
     timeout: 1200

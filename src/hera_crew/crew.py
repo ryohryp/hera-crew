@@ -23,7 +23,9 @@ class HeraUI:
         (4, "Final Verification",  "Manager"),
     ]
 
-    def __init__(self, model_name: str):
+    def __init__(self, model_name: str | dict):
+        # model_name は単一の文字列 (後方互換) または
+        # {"thinker": "...", "critic": "...", "manager": "..."} の辞書を受け取る
         self.model_name = model_name
         self._status: dict[int, str] = {n: "pending" for n, _, _ in self._STEPS}
         self._start_at: dict[int, float] = {}
@@ -60,9 +62,18 @@ class HeraUI:
         output_text = self._output[-2000:] if self._output else "[dim]Waiting...[/dim]"
         output_panel = Panel(output_text, title=title, border_style="cyan", padding=(1, 2))
 
+        if isinstance(self.model_name, dict):
+            model_label = (
+                f"[bold yellow]Thinker:[/] [white]{self.model_name.get('thinker', '-')}[/]\n"
+                f"[bold yellow]Critic :[/] [white]{self.model_name.get('critic', '-')}[/]\n"
+                f"[bold yellow]Manager:[/] [white]{self.model_name.get('manager', '-')}[/]"
+            )
+        else:
+            model_label = f"[bold yellow]Model:[/] [white]{self.model_name}[/]"
+
         return Group(
             Panel(
-                f"[bold yellow]Model:[/] [white]{self.model_name}[/]",
+                model_label,
                 title="[bold magenta]🤖 HERA Multi-Agent System[/]",
                 border_style="magenta",
             ),
@@ -117,11 +128,37 @@ class HeraCrew:
         self.config_path = Path(__file__).parent / "config"
         self.tasks_config = self._load_yaml("tasks.yaml")
 
-        self.model_cfg = LLMFactory.create_llm_config('hera', 'manager', "MANAGER_MODEL")
-        timeout_val = float(os.getenv("LITELLM_REQUEST_TIMEOUT", str(self.model_cfg.get('timeout', 1200))))
+        # 3役分離: Thinker / Critic / Manager それぞれに別モデルを割り当てる
+        # 環境変数 (THINKER_MODEL / CRITIC_MODEL / MANAGER_MODEL) で個別に上書き可能
+        self.role_cfgs: dict[str, dict] = LLMFactory.get_group_llms("hera")
+        self.thinker_cfg = self.role_cfgs["thinker"]
+        self.critic_cfg = self.role_cfgs["critic"]
+        self.manager_cfg = self.role_cfgs["manager"]
+
+        # 後方互換のため model_cfg は manager を指す
+        self.model_cfg = self.manager_cfg
+
+        # provider のタイムアウトは3役の最大値を採用
+        max_timeout = max(
+            self.thinker_cfg.get("timeout", 1200),
+            self.critic_cfg.get("timeout", 1200),
+            self.manager_cfg.get("timeout", 1200),
+        )
+        timeout_val = float(os.getenv("LITELLM_REQUEST_TIMEOUT", str(max_timeout)))
         self.provider = LiteLLMSDKProvider(default_timeout_s=timeout_val)
         self.shared_system_prompt = self._create_unified_prompt()
         self.tracker = UsageTracker()
+
+    async def _new_session(self, model: str) -> AgentSession:
+        """Step毎に切り替える AgentSession を生成する。"""
+        session = AgentSession(
+            model=model,
+            provider=self.provider,
+            system_prompt=self.shared_system_prompt,
+        )
+        await session.respond("System initialization. Awaiting tasks.")
+        self._record_session_usage(session, model=model)
+        return session
 
     def _load_yaml(self, filename: str) -> dict:
         path = self.config_path / filename
@@ -156,7 +193,9 @@ class HeraCrew:
         orchestrator_output_tokens: int = 0,
         orchestrator_model: str = "",
     ):
-        self.tracker.register_litellm(self.model_cfg['model'])
+        # tracker には3役全モデルを登録 (使用量レポートに全モデル分が出るように)
+        for cfg in (self.thinker_cfg, self.critic_cfg, self.manager_cfg):
+            self.tracker.register_litellm(cfg["model"])
         self.tracker.set_task(user_request)
         if orchestrator_input_tokens or orchestrator_output_tokens:
             self.tracker.record_orchestrator_usage(
@@ -166,20 +205,20 @@ class HeraCrew:
             )
         final_result = ""
         try:
-            with HeraUI(self.model_cfg['model']) as ui:
-                session = AgentSession(
-                    model=self.model_cfg['model'],
-                    provider=self.provider,
-                    system_prompt=self.shared_system_prompt,
-                )
-                await session.respond("System initialization. Awaiting tasks.")
-                self._record_session_usage(session)
+            ui_models = {
+                "thinker": self.thinker_cfg["model"],
+                "critic": self.critic_cfg["model"],
+                "manager": self.manager_cfg["model"],
+            }
+            with HeraUI(ui_models) as ui:
+                err = Console(stderr=True)
 
-                # Step 1: Task Decomposition
+                # Step 1: Task Decomposition (Thinker)
                 ui.start_step(1)
                 self.tracker.set_step("Task Decomposition")
-                Console(stderr=True).print(f"[dim]Calling {self.model_cfg['model']} for Task Decomposition...[/]")
+                err.print(f"[dim]Calling {self.thinker_cfg['model']} for Task Decomposition...[/]")
                 try:
+                    thinker_session = await self._new_session(self.thinker_cfg["model"])
                     task_info = self.tasks_config['task_decomposition']
                     prompt = (
                         f"Act as Thinker.\n"
@@ -188,19 +227,20 @@ class HeraCrew:
                         "CRITICAL INSTRUCTION: You MUST output your response as plain text. "
                         "Do NOT use any tools or function calls for this step."
                     )
-                    fork = await session.fork(prompt=prompt, policy=ForkPolicy.cache_safe_ephemeral())
+                    fork = await thinker_session.fork(prompt=prompt, policy=ForkPolicy.cache_safe_ephemeral())
                     decomposition_result = fork.final_text
-                    self._record_session_usage(fork)
+                    self._record_session_usage(fork, model=self.thinker_cfg["model"])
                     ui.complete_step(1, decomposition_result)
                 except Exception as e:
                     ui.fail_step(1, str(e))
                     raise
 
-                # Step 2: Logic Evaluation
+                # Step 2: Logic Evaluation (Critic)
                 ui.start_step(2)
                 self.tracker.set_step("Logic Evaluation")
-                Console(stderr=True).print(f"[dim]Calling {self.model_cfg['model']} for Logic Evaluation...[/]")
+                err.print(f"[dim]Calling {self.critic_cfg['model']} for Logic Evaluation...[/]")
                 try:
+                    critic_session = await self._new_session(self.critic_cfg["model"])
                     task_info = self.tasks_config['logic_evaluation']
                     prompt = (
                         f"Act as Critic.\n"
@@ -210,40 +250,41 @@ class HeraCrew:
                         "CRITICAL INSTRUCTION: You MUST output your response as plain text. "
                         "Do NOT use any tools or function calls for this step."
                     )
-                    fork = await session.fork(prompt=prompt, policy=ForkPolicy.cache_safe_ephemeral())
+                    fork = await critic_session.fork(prompt=prompt, policy=ForkPolicy.cache_safe_ephemeral())
                     evaluation_result = fork.final_text
-                    self._record_session_usage(fork)
+                    self._record_session_usage(fork, model=self.critic_cfg["model"])
                     ui.complete_step(2, evaluation_result)
                 except Exception as e:
                     ui.fail_step(2, str(e))
                     raise
 
-                # Step 3: Execution & Routing
+                # Step 3: Execution & Routing (Manager)
                 ui.start_step(3)
                 self.tracker.set_step("Execution & Routing")
-                Console(stderr=True).print(f"[dim]Calling {self.model_cfg['model']} for Execution & Routing...[/]")
+                err.print(f"[dim]Calling {self.manager_cfg['model']} for Execution & Routing...[/]")
                 try:
+                    manager_session = await self._new_session(self.manager_cfg["model"])
                     task_info = self.tasks_config['execution_routing']
                     prompt = (
-                        f"Act as Manager/Thinker.\n"
+                        f"Act as Manager.\n"
                         f"Context: {decomposition_result}\n"
                         f"Evaluation: {evaluation_result}\n"
                         f"Description: {task_info['description']}\n"
                         f"Expected Output: {task_info['expected_output']}"
                     )
-                    session.tools = [ANTIGRAVITY_DELEGATE_SPEC]
+                    manager_session.tools = [ANTIGRAVITY_DELEGATE_SPEC]
                     execution_policy = ForkPolicy.cache_safe_ephemeral()
                     execution_policy.max_turns = 3
-                    fork = await session.fork(
+                    fork = await manager_session.fork(
                         prompt=prompt,
                         tool_executor=self._tool_executor,
                         policy=execution_policy,
                     )
                     execution_result = fork.final_text
-                    self._record_session_usage(fork)
-                    session.tools = []
+                    self._record_session_usage(fork, model=self.manager_cfg["model"])
+                    manager_session.tools = []
                     if not execution_result:
-                        fork = await session.fork(
+                        fork = await manager_session.fork(
                             prompt=(
                                 "CRITICAL INSTRUCTION: The tool has executed successfully. "
                                 "Now, provide a plain text summary of the final result based on "
@@ -252,16 +293,17 @@ class HeraCrew:
                             policy=ForkPolicy.cache_safe_ephemeral(),
                         )
                         execution_result = fork.final_text
-                        self._record_session_usage(fork)
+                        self._record_session_usage(fork, model=self.manager_cfg["model"])
                     ui.complete_step(3, execution_result)
                 except Exception as e:
                     ui.fail_step(3, str(e))
                     raise
 
-                # Step 4: Final Verification
+                # Step 4: Final Verification (Manager)
+                # Step3 の manager_session を再利用してOllama側のモデル再ロードを避ける
                 ui.start_step(4)
                 self.tracker.set_step("Final Verification")
-                Console(stderr=True).print(f"[dim]Calling {self.model_cfg['model']} for Final Verification...[/]")
+                err.print(f"[dim]Calling {self.manager_cfg['model']} for Final Verification...[/]")
                 try:
                     task_info = self.tasks_config['final_verification']
                     prompt = (
@@ -273,9 +315,9 @@ class HeraCrew:
                         "CRITICAL INSTRUCTION: You MUST output your response as plain text. "
                         "Do NOT use any tools or function calls for this step."
                     )
-                    fork = await session.fork(prompt=prompt, policy=ForkPolicy.cache_safe_ephemeral())
+                    fork = await manager_session.fork(prompt=prompt, policy=ForkPolicy.cache_safe_ephemeral())
                     final_result = fork.final_text or execution_result
-                    self._record_session_usage(fork)
+                    self._record_session_usage(fork, model=self.manager_cfg["model"])
                     ui.complete_step(4, final_result)
                 except Exception as e:
                     ui.fail_step(4, str(e))
