@@ -3,24 +3,26 @@
 default_ollama_base_url: "http://localhost:11434"
 
 # HERA Strategy Models (Used in crew.py)
-# 3役分離構成 (VRAM 16GB / RX 6800 想定)
-# Ollama側でモデル切替時にswapが発生するため、num_ctxはVRAMに収まる範囲で設定
+# 3役分離構成 (VRAM 16GB / RX 6800)
+# 各モデル単独で必ずVRAMに収まるサイズに統一 (CPUオフロード回避)
+# Ollama側でStep切替時にモデルswapが発生するが、各時点では1モデルのみVRAMに乗る
 hera:
   manager:
     # Step3 Execution & Routing / Step4 Final Verification を担当
-    # MoE (A3B) なのでアクティブパラメータは小さく、推論は軽い
-    model: "ollama/qwen3.6:35B-A3B"
+    # 推論強化型 R1 系。論理判断と最終検証に向く (9GB)
+    model: "ollama/deepseek-r1:14b"
     timeout: 1200
     num_ctx: 32768
   thinker:
     # Step1 Task Decomposition を担当
-    # コーディング・構造化指示の分解に強いモデルを採用
+    # コード/構造化指示の分解に強い qwen2.5-coder (9GB)
     model: "ollama/qwen2.5-coder:14b"
     timeout: 1200
     num_ctx: 32768
   critic:
     # Step2 Logic Evaluation を担当
-    # 軽量・高速で評価ループを回す
+    # 軽量汎用モデル。HERAのshared_system_promptと整合 (5.2GB)
+    # ※ the-critic:latest はカスタムSYSTEMがHERAのsystem_promptに上書きされるため不採用
     model: "ollama/qwen3:8b"
     timeout: 1200
     num_ctx: 16384

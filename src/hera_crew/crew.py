@@ -51,6 +51,8 @@ class HeraUI:
                 icon, style, t = "⏳", "bold yellow", f"{elapsed:.1f}s"
             elif s == "failed":
                 icon, style, t = "❌", "bold red", f"{self._elapsed.get(num, 0):.1f}s"
+            elif s == "skipped":
+                icon, style, t = "⏭", "dim cyan", "—"
             else:
                 icon, style, t = "✅", "green", f"{self._elapsed.get(num, 0):.1f}s"
             table.add_row(icon, task_name, agent_name, t, style=style)
@@ -95,6 +97,12 @@ class HeraUI:
         self._status[step_num] = "done"
         self._elapsed[step_num] = time.time() - self._start_at.get(step_num, time.time())
         self._output = output
+        if self._live:
+            self._live.update(self)
+
+    def skip_step(self, step_num: int):
+        """早期終了でスキップされたステップを「失敗ではなくスキップ」として記録する"""
+        self._status[step_num] = "skipped"
         if self._live:
             self._live.update(self)
 
@@ -148,6 +156,33 @@ class HeraCrew:
         self.provider = LiteLLMSDKProvider(default_timeout_s=timeout_val)
         self.shared_system_prompt = self._create_unified_prompt()
         self.tracker = UsageTracker()
+
+    @staticmethod
+    def _detect_simple_shortcut(text: str) -> str | None:
+        """
+        Thinker の応答が早期終了マーカー "SIMPLE:" で始まるか検査する。
+        該当した場合は SIMPLE: を取り除いた本文を返し、それ以外は None。
+
+        判定はゆるく、先頭から最大80文字以内に "SIMPLE:" が出現すれば成立。
+        モデルが余分な前置き ("以下が応答です:" 等) を付ける場合への保険。
+        """
+        if not text:
+            return None
+        # 先頭の <think>...</think> ブロック (deepseek-r1 系) は除去
+        body = text
+        if body.lstrip().startswith("<think>"):
+            end = body.find("</think>")
+            if end >= 0:
+                body = body[end + len("</think>"):]
+        body = body.lstrip()
+        head = body[:80].upper()
+        idx = head.find("SIMPLE:")
+        if idx < 0:
+            return None
+        # SIMPLE: マーカー以降を取り出す
+        marker_end = body.upper().find("SIMPLE:") + len("SIMPLE:")
+        answer = body[marker_end:].strip()
+        return answer if answer else None
 
     async def _new_session(self, model: str) -> AgentSession:
         """Step毎に切り替える AgentSession を生成する。"""
@@ -234,6 +269,22 @@ class HeraCrew:
                 except Exception as e:
                     ui.fail_step(1, str(e))
                     raise
+
+                # ── 早期終了 (short-circuit) 判定 ─────────────────────────
+                # Thinker が "SIMPLE:" で応答した場合、Step2-4 をスキップして
+                # 直接 final_result とする。挨拶・自明な質問などへの高速応答用。
+                early = self._detect_simple_shortcut(decomposition_result)
+                if early is not None:
+                    err.print(
+                        "[bold green]Early termination[/]: Thinker classified the request as SIMPLE. "
+                        "Skipping Step 2-4."
+                    )
+                    self.tracker.mark_early_termination()
+                    # 残りステップをUI上ではスキップ表示にする
+                    for n in (2, 3, 4):
+                        ui.skip_step(n)
+                    final_result = early
+                    return final_result
 
                 # Step 2: Logic Evaluation (Critic)
                 ui.start_step(2)

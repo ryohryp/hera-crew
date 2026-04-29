@@ -115,10 +115,29 @@ class UsageTracker:
         self._orch_output_tokens: int = 0
         self._orch_model: str = ""
         self._errors: list[_ErrorRecord] = []
+        # 3役分離対応: 登録された全モデルを順序保持・重複なしで記録する
+        self._registered_models: list[str] = []
+        self._litellm_callbacks_registered: bool = False
+        # Step1の早期終了 (SIMPLE shortcut) フラグ
+        self._early_termination: bool = False
+
+    def mark_early_termination(self) -> None:
+        """Thinkerが単純タスクと判定し、Step2-4をスキップしたことを記録"""
+        self._early_termination = True
 
     def register_litellm(self, model_name: str = "") -> None:
-        self._model_name = model_name
-        self._run_start = time.time()
+        # 1回目だけ run_start と _model_name (代表値) を設定
+        if not self._registered_models:
+            self._model_name = model_name
+            self._run_start = time.time()
+        # 重複なしで追加
+        if model_name and model_name not in self._registered_models:
+            self._registered_models.append(model_name)
+
+        # litellm のコールバックは一度だけ登録 (3役登録時に重複登録を回避)
+        if self._litellm_callbacks_registered:
+            return
+        self._litellm_callbacks_registered = True
         tracker = self
 
         def _on_success(kwargs, response_obj, start_time, end_time):
@@ -303,9 +322,21 @@ class UsageTracker:
 
     def _append_history(self, ts: str, elapsed: float, output_dir: Path) -> None:
         steps_completed = list(self._step_elapsed.keys())
-        pipeline_complete = all(s in self._step_elapsed for s in PIPELINE_STEPS)
+        # 早期終了の場合は「Step1だけ実行で完了扱い」とする (失敗ではない)
+        if self._early_termination:
+            pipeline_complete = "Task Decomposition" in self._step_elapsed
+        else:
+            pipeline_complete = all(s in self._step_elapsed for s in PIPELINE_STEPS)
         step_summaries = {s.name: {"prompt": s.prompt_tokens, "completion": s.completion_tokens, "total": s.total}
                           for s in self._step_summaries()}
+        # 3役分離対応: ステップ毎に使われたモデル名を集計 (record単位の model から)
+        step_models: dict[str, str] = {}
+        for r in self._records:
+            if r.step in step_models:
+                if r.model not in step_models[r.step].split(","):
+                    step_models[r.step] = step_models[r.step] + "," + r.model
+            else:
+                step_models[r.step] = r.model
         entry = {
             "ts": ts,
             "task": self._task,
@@ -318,10 +349,15 @@ class UsageTracker:
             "elapsed_s": round(elapsed, 1),
             "call_count": self.call_count,
             "delegations": self._delegations,
-            "model": self._model_name,
+            # 後方互換のため model は単一値 (代表 = 最後に登録 = manager)
+            "model": self._registered_models[-1] if self._registered_models else self._model_name,
+            # 3役分離対応の新フィールド
+            "models": list(self._registered_models) if self._registered_models else [self._model_name],
+            "step_models": step_models,
             "step_elapsed": {k: round(v, 1) for k, v in self._step_elapsed.items()},
             "steps_completed": steps_completed,
             "pipeline_complete": pipeline_complete,
+            "early_termination": self._early_termination,
             "step_tokens": step_summaries,
             "orch_input_tokens": self._orch_input_tokens,
             "orch_output_tokens": self._orch_output_tokens,
@@ -732,6 +768,13 @@ class UsageTracker:
             else '<span class="badge badge-ok">100% ローカル処理</span>'
         )
 
+        # 早期終了バッジ (Step1のSIMPLE shortcutで完了した場合)
+        early_term_badge = (
+            '<span class="badge" style="background:#1e3a8a;color:#93c5fd;margin-left:.4rem;">'
+            '⚡ 早期終了 (Step1のみ)</span>'
+            if self._early_termination else ""
+        )
+
         # ── ステップ別トークン棒グラフ ─────────────────────────────────────
         step_bars = ""
         colors = ["#6366f1", "#22d3ee", "#f59e0b", "#34d399"]
@@ -1077,7 +1120,7 @@ class UsageTracker:
 <body>
 
 <h1>🤖 HERA 実行レポート</h1>
-<p class="meta">生成日時: {ts_display} &nbsp;·&nbsp; モデル: {self._model_name}</p>
+<p class="meta">生成日時: {ts_display} &nbsp;·&nbsp; モデル: {' / '.join(self._registered_models) if self._registered_models else self._model_name}</p>
 {f'<p class="task-text">📋 {self._task}</p>' if self._task else ""}
 {summary_html}
 
@@ -1087,6 +1130,7 @@ class UsageTracker:
     <div class="card-value">${hera_savings:.4f}</div>
     <div class="ref">vs {savings_ref_label}（{savings_ref_price_str}）</div>
     {delegation_badge}
+    {early_term_badge}
   </div>
   <div class="card tokens">
     <div class="card-label">使用トークン数</div>
